@@ -27,7 +27,7 @@
 #define PING    11
 #define PACK    12
 #define SEQNO   13
-#define SACK    14
+#define SEQACK  14
 #define RSYN    15
 
 
@@ -41,7 +41,10 @@
 #define RESPONSE_DATA_SIZE 16
 #define NAME_SIZE     16
 
-extern const char *cmdnames[16];
+const char *cmdnames[16] = {"", "QUERY", "QACK","CONNECT", "CACK", 
+                                 "RESPONSE", "RACK", "DISCONNECT", "DACK",
+                                 "COMMAND", "COMMANDACK", "PING", "PACK", "SEQNO",
+                                 "SEQACK", "RSYN"};
 
 typedef nx_struct ph {
    nx_uint8_t src_chan_num;

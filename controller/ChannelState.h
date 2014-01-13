@@ -35,7 +35,7 @@ typedef struct channel_state{
    uint8_t attempts_left;
    uint8_t timer;
    DataPayload packet;
-}ChannelState;
+}ChanState;
 
 
 

@@ -13,7 +13,7 @@ implementation {
 	static Channel *nextFree;
 	uint8_t size;
 
-	void init_state(ChannelState *state, uint8_t chan_num){
+	void init_state(ChanState *state, uint8_t chan_num){
 		state->chan_num = chan_num;
 		state->seqno = 0;
 		state->remote_addr = 0;
@@ -38,9 +38,10 @@ implementation {
 	 * create a new channel if space available
 	 * return channel num if successful, 0 otherwise
 	 */
-	command ChannelState * ChannelTable.new_channel(){
+	command ChanState* ChannelTable.new_channel(){
+		Channel *temp;
 		if (size >= CHANNEL_NUM) return NULL;
-		Channel *temp = nextFree;
+		temp = nextFree;
 		temp->active = 1;
 		nextFree = temp->nextChannel;
 		temp->nextChannel = NULL;
@@ -52,7 +53,7 @@ implementation {
 	 * get the channel state for the given channel number
 	 * return 1 if successful, 0 otherwise
 	 */
-	command ChannelState * ChannelTable.get_channel_state(int channel){
+	command ChanState* ChannelTable.get_channel_state(int channel){
 		if (channelTable[channel-1].active){
 			return &(channelTable[channel-1].state);
 		} else return NULL;
@@ -72,5 +73,5 @@ implementation {
 	/* 
 	 * destroys table 
 	 */
-	command void ChannelTable.destroy_table();
+	command void ChannelTable.destroy_table(){}
 }

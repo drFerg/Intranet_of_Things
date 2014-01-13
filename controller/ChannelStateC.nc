@@ -7,7 +7,7 @@ module ChannelStateC {
 	provides interface ChannelState;
 }
 implementation{
-	command void ChannelState.init_state(ChannelState *state, uint8_t chan_num){
+	command void ChannelState.init_state(ChanState *state, uint8_t chan_num){
 		state->chan_num = chan_num;
 		state->seqno = 0;
 		state->remote_addr = 0;
