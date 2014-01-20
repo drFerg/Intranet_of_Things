@@ -1,9 +1,5 @@
 interface KNoT{
 
-	/* A helper function to fill in a DataPayload struct */
-	command void dp_complete(DataPayload *dp, uint8_t src, uint8_t dst, 
-             uint8_t cmd, uint8_t len);
-
 	/* Checks the sequence number and returns 1 if in sequence, 0 otherwise */
 	command int valid_seqno(ChanState *state, DataPayload *dp);
 
@@ -12,6 +8,22 @@ interface KNoT{
 
 	/* Sends a DataPayload as a broadcast transmission */
 	command void knot_broadcast(ChanState *state, DataPayload *dp);
+
+	command void query(ChanState* state, uint8_t type);
+
+	command void query_handler(ChanState *state, DataPayload *dp, uint8_t src);
+
+	command void qack_handler(ChanState *state, DataPayload *dp, uint8_t src);
+
+	command void connect(ChanState *new_state, uint8_t addr, int rate);
+
+	command void connect_handler(ChanState *state, DataPayload *dp, uint8_t src);
+
+	command uint8_t cack_handler(ChanState *state, DataPayload *dp);
+
+	command void response_handler(ChanState *state, DataPayload *dp);
+	
+	command void send_rack(ChanState *state);
 
 	/* Sends a ping packet to the channel in state */
 	command void ping(ChanState *state);

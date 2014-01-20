@@ -1,8 +1,9 @@
 CFLAGS += -I$(TOSDIR)/lib/printf 
 CFLAGS += -DTOSH_DATA_LENGTH=100
 CFLAGS += -DDEBUG -DTELOS 
-CFLAGS += -DDEVICE_NAME=\"Controller\" -I../lib
+CFLAGS += -DDEVICE_NAME=\"Temp Sensor\" -DSENSOR_TYPE=1 -DDATA_RATE=1
+CFLAGS += -I../lib
 #CFLAGS += -DSIM
-COMPONENT=ControllerAppC
+COMPONENT=SensorAppC
 
 include $(MAKERULES)

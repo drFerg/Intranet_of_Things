@@ -7,6 +7,7 @@
 #ifndef KNOT_PROTOCOL_H
 #define KNOT_PROTOCOL_H
 #include <stdint.h>
+
 //Sensor type
 #define TEMP   1
 #define HUM    2
@@ -31,7 +32,7 @@
 #define RSYN    15
 
 
-#define CMD_LOW CONNECT
+#define CMD_LOW QUERY
 #define CMD_HIGH RSYN		/* change this if commands added */
 
 /* =======================*/
@@ -58,15 +59,11 @@ typedef nx_struct dh {
    nx_uint16_t tlen;	/* total length of the data */
 } DataHeader;
 
-
 typedef nx_struct dp {		/* template for data payload */
    PayloadHeader hdr;
    DataHeader dhdr;
    nx_uint8_t data[MAX_DATA_SIZE];	/* data is address of `len' bytes */
 } DataPayload;
-
-
-
 
 /* Message Payloads */
 
@@ -90,6 +87,10 @@ typedef nx_struct cack{
    nx_uint8_t accept;
 }ConnectACKMsg;
 
+typedef nx_struct response{
+   nx_uint16_t data;
+}ResponseMsg;
+
 typedef nx_struct serial_query_response{
    nx_uint8_t type;
    nx_uint16_t rate;
@@ -101,6 +102,11 @@ typedef nx_struct serial_response{
    nx_uint16_t data;
    nx_uint8_t src;
 }SerialResponseMsg;
+
+typedef nx_struct serial_connect{
+   nx_uint8_t addr;
+   nx_uint8_t rate;
+}SerialConnect;
 
 typedef nx_struct serial_cack{
    nx_uint8_t accept;

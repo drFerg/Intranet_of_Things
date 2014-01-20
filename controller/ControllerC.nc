@@ -18,6 +18,8 @@
 #endif
 
 #define HOME_CHANNEL 0
+#define SERIAL_SEARCH 1
+#define SERIAL_CONNECT 2
 
 module ControllerC @safe()
 {
@@ -25,17 +27,13 @@ module ControllerC @safe()
         interface Boot;
         interface AMPacket;
         interface SplitControl as RadioControl;
+        interface SplitControl as SerialControl;
         interface AMSend;
         interface Receive;
-        interface AMSend as SerialAMSend;
+        interface AMSend as SerialSend;
         interface Receive as SerialReceive;
         interface Timer<TMilli>;
-        interface Timer<TMilli> as LEDTimer0;
-        interface Timer<TMilli> as LEDTimer1;
-        interface Timer<TMilli> as LEDTimer2;
-        interface Read<uint16_t> as LightSensor;
-        interface Read<uint16_t> as TempSensor;
-        interface Leds;
+        interface LEDBlink;
         interface ChannelTable;
         interface ChannelState;
         interface KNoT;
@@ -45,81 +43,16 @@ implementation
 {
 	bool sendBusy = FALSE;
 	bool serialSendBusy = FALSE;
-	nx_uint8_t temp;
-    nx_uint8_t light;
-	
-	message_t serial_pkt;
-
-	char controller_name[] = "The Boss";
-	ChanState home_channel_state;
+	ChanState home_chan;
 	int serial_ready = 0;
 	char buf[50];
 	int serial_index = 0;
-	int addr = 0;
-	char serialpkt[32];
 
-	/*-----------LED Commands------------------------------- */
-    void pulse_green_led(int t){
-        call Leds.led1Toggle();
-        call LEDTimer2.startOneShot(t);
-    }
 
-    void pulse_red_led(int t){
-        call Leds.led0Toggle();
-        call LEDTimer0.startOneShot(t);
-    }
-
-    void pulse_blue_led(int t){
-        call Leds.led2Toggle();
-        call LEDTimer1.startOneShot(t);
-    }
 	/*------------------------------------------------------- */
 
-	/*-----------Reports------------------------------- */
-  	// Use LEDs to report various status issues.
-    void report_problem() { PRINTF("ID: %d, Problem\n",TOS_NODE_ID);pulse_red_led(1000);pulse_blue_led(1000);pulse_green_led(1000); }
-    void report_sent() {PRINTF("ID: %d, Sent tweet\n",TOS_NODE_ID);pulse_green_led(100);}
-    void report_received() {PRINTF("ID: %d, Received tweet\n",TOS_NODE_ID);PRINTFFLUSH();pulse_red_led(100);pulse_blue_led(100);}
-    void report_dropped(){PRINTF("ID: %d, Dropped tweet\n----------\n",TOS_NODE_ID);PRINTFFLUSH();pulse_red_led(1000);}
       
 	/*------------------------------------------------- */
-		
-
-	void qack_handler(DataPayload *dp, uint8_t src) {
-		DataPayload *pkt = (DataPayload *) (call SerialAMSend.getPayload(&serial_pkt, sizeof(DataPayload)));
-		SerialQueryResponseMsg *qr;
-	    ChanState *state = &home_channel_state;
-		if (state->state != STATE_QUERY) {
-			PRINTF("Not in Query state\n");
-			return;
-		}
-	    state->remote_addr = src; 
-		PRINTF("Query ACK received from Thing: \n");
-		PRINTF("%d\n",state->remote_addr);
-		qr = (SerialQueryResponseMsg *) &dp->data;
-		qr->src = state->remote_addr;
-		PRINTF("%d\n", qr->src);
-		memcpy(pkt, dp, sizeof(DataPayload));
-		if (call SerialAMSend.send(0, &serial_pkt, sizeof(DataPayload)) == SUCCESS){
-			serialSendBusy = TRUE;
-		}
-	}
-
-	void service_search(ChanState* state, uint8_t type){
-		DataPayload *new_dp;
-		QueryMsg *q = (QueryMsg *) new_dp->data;
-	    new_dp = &(state->packet); 
-	    clean_packet(new_dp);
-	    call KNoT.dp_complete(new_dp, HOME_CHANNEL, HOME_CHANNEL, 
-	             QUERY, sizeof(QueryMsg));
-	    q->type = type;
-	    strcpy((char*)q->name, controller_name);
-	    call KNoT.knot_broadcast(state, new_dp);
-	    //set_ticks(state, TICKS);
-	    set_state(state, STATE_QUERY);
-	    // Set timer to exit Query state after 5 secs~
-	}
-
 	
 	event void Boot.booted() {
 		PRINTF("*********************\n****** BOOTED *******\n*********************\n");
@@ -129,7 +62,12 @@ implementation
     event void RadioControl.startDone(error_t error) {}
 
     event void RadioControl.stopDone(error_t error) {}
-/*----------------Security events -------------------------------*/
+ 	event void SerialControl.startDone(error_t error) {}
+
+    event void SerialControl.stopDone(error_t error) {}
+
+	//ChanState * new_state = call ChannelTable.new_channel();
+
    
 /*-----------Received packet event, main state event ------------------------------- */
     event message_t* Receive.receive(message_t* msg, void* payload, uint8_t len) {
@@ -147,13 +85,13 @@ implementation
 		switch(cmd) { /* Drop packets for cmds we don't accept */
         case(QUERY):   return msg;
         case(CONNECT): return msg;
-        case(QACK):    qack_handler(dp, src);return msg;
+        case(QACK):    call KNoT.qack_handler(&home_chan, dp, src);return msg;
     	}
 	    /* Grab state for requested channel */
 		state = call ChannelTable.get_channel_state(dp->hdr.dst_chan_num);
 		if (!state){ /* Attempt to kill connection if no state held */
 			PRINTF("Channel ");PRINTF("%d", dp->hdr.dst_chan_num);PRINTF(" doesn't exist\n");
-			state = &home_channel_state;
+			state = &home_chan;
 			state->remote_chan_num = dp->hdr.src_chan_num;
 			state->remote_addr = src;
 			//close_graceful(state);
@@ -164,70 +102,54 @@ implementation
 		}
 
 		switch(cmd) {
-			//case(CACK):     	cack_handler(state, &dp);            break;
-			//case(RESPONSE): 	response_handler(state, &dp);        break;
-			//case(RSYN):		 	response_handler(state, &dp); send_rack(state); break;
+			case(CACK):     	call KNoT.cack_handler(state, dp);            break;
+			case(RESPONSE): 	call KNoT.response_handler(state, dp);        break;
+			case(RSYN):		 	call KNoT.response_handler(state, dp); call KNoT.send_rack(state); break;
 			// case(CMDACK):   	command_ack_handler(state,dp);break;
-			//case(PING):     	ping_handler(state, &dp);            break;
-			//case(PACK):     	pack_handler(state, &dp);            break;
-			//case(DISCONNECT):   disconnect_handler(state, &dp, src); break;
-	        //case(DACK):                                              break;
+			case(PING):     	call KNoT.ping_handler(state, dp);            break;
+			case(PACK):     	call KNoT.pack_handler(state, dp);            break;
+			//case(DISCONNECT):   call KNoT.disconnect_handler(state, dp, src); break;
+	        case(DACK):                                              break;
 			default: 			PRINTF("Unknown CMD type\n");
 		}
 		PRINTF("%s\n", "FINISHED.");
-        report_received();
+        call LEDBlink.report_received();
         PRINTF("----------\n");PRINTFFLUSH();
         return msg; /* Return packet to TinyOS */
     }
-    event message_t* SerialReceive.receive(message_t* msg, void* payload, uint8_t len) {
+    
+    event message_t *SerialReceive.receive(message_t *msg, void* payload, uint8_t len){
+    	DataPayload *dp = (DataPayload *)payload;
+		uint8_t cmd = dp->hdr.cmd;
+		PRINTF("SERIAL> Serial command received.\n");
+		PRINTF("SERIAL> Packet length: %d", dp->dhdr.tlen);
+		PRINTF("SERIAL> Message for channel %d", dp->hdr.dst_chan_num);
+
+		switch (cmd) {
+			case(SERIAL_SEARCH): call KNoT.query(&home_chan, ((QueryMsg*)dp)->type);break;
+			case(SERIAL_CONNECT): call KNoT.connect(call ChannelTable.new_channel(), 
+													((SerialConnect*)dp)->addr, 
+													((SerialConnect*)dp)->rate);break;
+		}
+		call LEDBlink.report_received();
     	return msg;
     }
 
     event void AMSend.sendDone(message_t* msg, error_t error) {
-        if (error == SUCCESS) report_sent();
-        else report_problem();
+        if (error == SUCCESS) call LEDBlink.report_sent();
+        else call LEDBlink.report_problem();
 
         sendBusy = FALSE;
     }
 
-    event void SerialAMSend.sendDone(message_t* msg, error_t error) {
-    if (error == SUCCESS)
-        report_sent();
-    else
-        report_problem();
+    event void SerialSend.sendDone(message_t *msg, error_t error){
+    	if (error == SUCCESS) call LEDBlink.report_sent();
+        else call LEDBlink.report_problem();
 
-    sendBusy = FALSE;
+        serialSendBusy = FALSE;
     }
+
 
     event void Timer.fired(){
     }
-
-    /*-----------LED Timer EVENTS------------------------------- */
-    event void LEDTimer1.fired(){
-        call Leds.led2Toggle();
-    }
-
-    event void LEDTimer0.fired(){
-        call Leds.led0Toggle();
-    }
-    event void LEDTimer2.fired(){
-        call Leds.led1Toggle();
-    }
-
-    /*-----------Sensor Events------------------------------- */
-    event void LightSensor.readDone(error_t result, uint16_t data) {
-        if (result != SUCCESS){
-            data = 0xffff;
-            report_problem();
-        }
-        light = data;
-    }
-    event void TempSensor.readDone(error_t result, uint16_t data) {
-        if (result != SUCCESS){
-            data = 0xffff;
-            report_problem();
-        }
-        temp = data;
-    }
-
 }
