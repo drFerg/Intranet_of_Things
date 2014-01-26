@@ -2,7 +2,7 @@
 configuration SensorAppC { }
 implementation
 {
-    components SensorC, MainC, ActiveMessageC, SerialStartC, SerialActiveMessageC;
+    components SensorC, MainC, SerialStartC, SerialActiveMessageC;
     components KNoTC, ChannelTableC, ChannelStateC, LEDBlinkC;
 /* Debug */
     #if DEBUG
@@ -20,15 +20,9 @@ implementation
     components new DemoSensorC() as LightSensor,
     new DemoSensorC() as TempSensor;
     #endif
-
-/* Radio/Serial*/
-    components new AMSenderC(AM_KNOT_MESSAGE);
-    components new AMReceiverC(AM_KNOT_MESSAGE);
+  
 
     SensorC.Boot -> MainC;
-    SensorC.RadioControl -> ActiveMessageC;
-    SensorC.AMSend -> AMSenderC;
-    SensorC.Receive -> AMReceiverC;
     SensorC.ChannelTable -> ChannelTableC;
     SensorC.ChannelState -> ChannelStateC;
     SensorC.Timer -> TimerMilliC;

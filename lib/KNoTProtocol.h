@@ -37,7 +37,6 @@
 
 /* =======================*/
 
-
 #define MAX_DATA_SIZE 32
 #define RESPONSE_DATA_SIZE 16
 #define NAME_SIZE     16
@@ -47,7 +46,7 @@ const char *cmdnames[16] = {"", "QUERY", "QACK","CONNECT", "CACK",
                                  "COMMAND", "COMMANDACK", "PING", "PACK", "SEQNO",
                                  "SEQACK", "RSYN"};
 
-typedef nx_struct ph {
+typedef nx_struct payload_header {
    nx_uint8_t src_chan_num;
    nx_uint8_t dst_chan_num;
    nx_uint8_t seqno;   /* sequence number */
@@ -55,11 +54,11 @@ typedef nx_struct ph {
    nx_uint16_t chksum;
 } PayloadHeader;
 
-typedef nx_struct dh {
+typedef nx_struct data_header {
    nx_uint16_t tlen;	/* total length of the data */
 } DataHeader;
 
-typedef nx_struct dp {		/* template for data payload */
+typedef nx_struct data_payload {		/* template for data payload */
    PayloadHeader hdr;
    DataHeader dhdr;
    nx_uint8_t data[MAX_DATA_SIZE];	/* data is address of `len' bytes */

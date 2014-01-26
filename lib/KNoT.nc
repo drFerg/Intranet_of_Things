@@ -39,4 +39,6 @@ interface KNoT{
 
 	/* Handles the reception of a DISCONNECT packet */
 	command void close_handler(ChanState *state, DataPayload *dp);
+
+	event message_t* receive(uint8_t src, message_t *msg, void *payload, uint8_t len);
 }

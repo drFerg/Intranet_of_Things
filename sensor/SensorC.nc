@@ -23,10 +23,6 @@ module SensorC @safe()
 {
     uses {
         interface Boot;
-        interface AMPacket;
-        interface SplitControl as RadioControl;
-        interface AMSend;
-        interface Receive;
         interface Timer<TMilli>;
         interface Read<uint16_t> as LightSensor;
         interface Read<uint16_t> as TempSensor;
@@ -38,15 +34,9 @@ module SensorC @safe()
 }
 implementation
 {
-	bool sendBusy = FALSE;
-	
 	nx_uint8_t temp;
     nx_uint8_t light;
-	ChanState home_channel_state;
-	int serial_ready = 0;
-	char buf[50];
-	int serial_index = 0;
-	int addr = 0;
+	ChanState home_chan;
 
 
 	/*------------------------------------------------------- */
@@ -57,39 +47,38 @@ implementation
 	event void Boot.booted() {
 		PRINTF("*********************\n****** BOOTED *******\n*********************\n");
         PRINTFFLUSH();
+        call ChannelTable.init_table();
+        call ChannelState.init_state(&home_chan, 0);
+        //call Timer.startPeriodic(5000);
     }
-/*-----------Radio & AM EVENTS------------------------------- */
-    event void RadioControl.startDone(error_t error) {}
 
-    event void RadioControl.stopDone(error_t error) {}
-/*----------------Security events -------------------------------*/
    
 /*-----------Received packet event, main state event ------------------------------- */
-    event message_t* Receive.receive(message_t* msg, void* payload, uint8_t len) {
+    event message_t* KNoT.receive(uint8_t src, message_t* msg, void* payload, uint8_t len) {
     	ChanState *state;
         DataPayload *dp = (DataPayload *) payload;
 		/* Gets data from the connection */
-		uint8_t src = 0;
-		//if (!src) return; /* The cake was a lie */
 	    uint8_t cmd = dp->hdr.cmd;
-		PRINTF("KNoT>> Received packet from Thing: ");PRINTF("%d\n", src);
-		PRINTF("Data is ");PRINTF("%d", dp->dhdr.tlen);PRINTF(" bytes long\n");
-		PRINTF("Received a ");PRINTF(cmdnames[cmd]);PRINTF(" command.\n");
-		PRINTF("Message for channel ");PRINTF("%d\n", dp->hdr.dst_chan_num);
-		
-		switch(cmd){
-            case(QUERY):        call KNoT.query_handler(dp, src);    return msg;
-            case(CONNECT):      call KNoT.connect_handler(dp, src);  return msg;
+		PRINTF("KNoT>> Received packet from Thing: %d\n", src);
+		PRINTF("Data is %d bytes long\n", dp->dhdr.tlen);
+		PRINTF("Received a %s command\n", cmdnames[cmd]);
+		PRINTF("Message for channel %d\n", dp->hdr.dst_chan_num);
+        PRINTFFLUSH();
+
+        switch(cmd){
+            case(QUERY): call KNoT.query_handler(&home_chan, dp, src); return msg;
+            case(CONNECT): call KNoT.connect_handler(call ChannelTable.new_channel(), dp, src); return msg;
         }
-	    /* Grab state for requested channel */
-		state = call ChannelTable.get_channel_state(dp->hdr.dst_chan_num);
-		/* Always allow disconnections to prevent crazies */
+
+        /* Grab state for requested channel */
+        state = call ChannelTable.get_channel_state(dp->hdr.dst_chan_num);
+        /* Always allow disconnections to prevent crazies */
         if (cmd == DISCONNECT) {
             if (state) {
                 //remove_timer(state->timer);
                 call ChannelTable.remove_channel(state->chan_num);
             }
-            state = &home_channel_state;
+            state = &home_chan;
             state->remote_addr = src; /* Rest of disconnect handled later */ 
         } else if (!state){
             PRINTF("Channel doesn't exist\n");
@@ -100,29 +89,21 @@ implementation
         }
         /* PUT IN QUERY CHECK FOR TYPE */
         switch(cmd){
-            case(CACK):         cack_handler(state, dp);   break;
-            case(PING):         ping_handler(state, dp);   break;
-            case(PACK):         pack_handler(state, dp);   break;
-            case(RACK):         rack_handler(state, dp);   break;
-            case(DISCONNECT):   close_handler(state, dp);  break;
-            default:            PRINT(F("Unknown CMD type\n"));
+            case(CACK):         call KNoT.cack_handler(state, dp);   break;
+            case(PING):         call KNoT.ping_handler(state, dp);   break;
+            case(PACK):         call KNoT.pack_handler(state, dp);   break;
+            //case(RACK):         call KNoT.rack_handler(state, dp);   break;
+            case(DISCONNECT):   call KNoT.close_handler(state, dp);  break;
+            default:            PRINTF("Unknown CMD type\n");
         }
-		PRINTF("FINISHED.\n");
+        PRINTF("FINISHED.\n");
         call LEDBlink.report_received();
         PRINTF("----------\n");PRINTFFLUSH();
         return msg; /* Return packet to TinyOS */
     }
-    
-
-    event void AMSend.sendDone(message_t* msg, error_t error) {
-        if (error == SUCCESS) call LEDBlink.report_sent();
-        else call LEDBlink.report_problem();
-
-        sendBusy = FALSE;
-    }
-
 
     event void Timer.fired(){
+        call KNoT.query(&home_chan, 1);
     }
 
     

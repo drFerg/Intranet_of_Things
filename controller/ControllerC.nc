@@ -18,18 +18,18 @@
 #endif
 
 #define HOME_CHANNEL 0
-#define SERIAL_SEARCH 1
-#define SERIAL_CONNECT 2
+
 
 module ControllerC @safe()
 {
     uses {
         interface Boot;
-        interface AMPacket;
-        interface SplitControl as RadioControl;
+       	//interface Packet;
+        //interface AMPacket;
+        //interface SplitControl as RadioControl;
         interface SplitControl as SerialControl;
-        interface AMSend;
-        interface Receive;
+        //interface AMSend;
+        //interface Receive;
         interface AMSend as SerialSend;
         interface Receive as SerialReceive;
         interface Timer<TMilli>;
@@ -41,15 +41,8 @@ module ControllerC @safe()
 }
 implementation
 {
-	bool sendBusy = FALSE;
-	bool serialSendBusy = FALSE;
 	ChanState home_chan;
-	int serial_ready = 0;
-	char buf[50];
-	int serial_index = 0;
-
-
-	/*------------------------------------------------------- */
+	bool serialSendBusy = FALSE;
 
       
 	/*------------------------------------------------- */
@@ -57,35 +50,34 @@ implementation
 	event void Boot.booted() {
 		PRINTF("*********************\n****** BOOTED *******\n*********************\n");
         PRINTFFLUSH();
+        call ChannelTable.init_table();
+        call ChannelState.init_state(&home_chan, 0);
     }
-/*-----------Radio & AM EVENTS------------------------------- */
-    event void RadioControl.startDone(error_t error) {}
-
-    event void RadioControl.stopDone(error_t error) {}
+    
  	event void SerialControl.startDone(error_t error) {}
 
     event void SerialControl.stopDone(error_t error) {}
 
-	//ChanState * new_state = call ChannelTable.new_channel();
 
    
 /*-----------Received packet event, main state event ------------------------------- */
-    event message_t* Receive.receive(message_t* msg, void* payload, uint8_t len) {
+    event message_t* KNoT.receive(uint8_t src, message_t* msg, void* payload, uint8_t len) {
     	ChanState *state;
         DataPayload *dp = (DataPayload *) payload;
 		/* Gets data from the connection */
-		uint8_t src = 0;
 		//if (!src) return; /* The cake was a lie */
 	    uint8_t cmd = dp->hdr.cmd;
-		PRINTF("KNoT>> Received packet from Thing: ");PRINTF("%d\n", src);
-		PRINTF("Data is ");PRINTF("%d", dp->dhdr.tlen);PRINTF(" bytes long\n");
-		PRINTF("Received a ");PRINTF(cmdnames[cmd]);PRINTF(" command.\n");
-		PRINTF("Message for channel ");PRINTF("%d\n", dp->hdr.dst_chan_num);
-		
+	    PRINTF("message size: %d\n", sizeof(message_t));
+		PRINTF("CON>> Received packet from Thing: %d\n", src);
+		PRINTF("CON>> Data is %d bytes long\n", dp->dhdr.tlen);
+		PRINTF("CON>> Received a %s command\n", cmdnames[cmd]);
+		PRINTF("CON>> Message for channel %d\n", dp->hdr.dst_chan_num);
+		PRINTFFLUSH();
+
 		switch(cmd) { /* Drop packets for cmds we don't accept */
-        case(QUERY):   return msg;
-        case(CONNECT): return msg;
-        case(QACK):    call KNoT.qack_handler(&home_chan, dp, src);return msg;
+	        case(QUERY):   PRINTF("NOT FOR US\n");PRINTFFLUSH();return msg;
+	        case(CONNECT): return msg;
+	        case(QACK):    call KNoT.qack_handler(&home_chan, dp, src);return msg;
     	}
 	    /* Grab state for requested channel */
 		state = call ChannelTable.get_channel_state(dp->hdr.dst_chan_num);
@@ -118,16 +110,25 @@ implementation
         return msg; /* Return packet to TinyOS */
     }
     
-    event message_t *SerialReceive.receive(message_t *msg, void* payload, uint8_t len){
+   
+/*
+    event void AMSend.sendDone(message_t* msg, error_t error) {
+    }
+*/
+	event message_t *SerialReceive.receive(message_t *msg, void* payload, uint8_t len){
     	DataPayload *dp = (DataPayload *)payload;
-		uint8_t cmd = dp->hdr.cmd;
+    	uint8_t cmd = dp->hdr.cmd;
+    	call LEDBlink.report_received();
+		
 		PRINTF("SERIAL> Serial command received.\n");
-		PRINTF("SERIAL> Packet length: %d", dp->dhdr.tlen);
-		PRINTF("SERIAL> Message for channel %d", dp->hdr.dst_chan_num);
+		PRINTF("SERIAL> Packet length: %d\n", dp->dhdr.tlen);
+		PRINTF("SERIAL> Message for channel %d\n", dp->hdr.dst_chan_num);
+		PRINTF("SERIAL> Command code: %d\n", dp->hdr.cmd);
+		PRINTFFLUSH();
 
 		switch (cmd) {
-			case(SERIAL_SEARCH): call KNoT.query(&home_chan, ((QueryMsg*)dp)->type);break;
-			case(SERIAL_CONNECT): call KNoT.connect(call ChannelTable.new_channel(), 
+			case(QUERY): call KNoT.query(&home_chan, 1/*((QueryMsg*)dp)->type*/);break;
+			case(CONNECT): call KNoT.connect(call ChannelTable.new_channel(), 
 													((SerialConnect*)dp)->addr, 
 													((SerialConnect*)dp)->rate);break;
 		}
@@ -135,20 +136,14 @@ implementation
     	return msg;
     }
 
-    event void AMSend.sendDone(message_t* msg, error_t error) {
-        if (error == SUCCESS) call LEDBlink.report_sent();
-        else call LEDBlink.report_problem();
-
-        sendBusy = FALSE;
-    }
-
-    event void SerialSend.sendDone(message_t *msg, error_t error){
+ 	event void SerialSend.sendDone(message_t *msg, error_t error){
     	if (error == SUCCESS) call LEDBlink.report_sent();
         else call LEDBlink.report_problem();
 
         serialSendBusy = FALSE;
     }
 
+   
 
     event void Timer.fired(){
     }

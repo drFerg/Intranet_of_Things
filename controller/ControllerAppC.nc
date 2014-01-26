@@ -2,7 +2,7 @@
 configuration ControllerAppC { }
 implementation
 {
-    components ControllerC, MainC, ActiveMessageC, SerialStartC, SerialActiveMessageC;
+    components ControllerC, MainC, SerialStartC, SerialActiveMessageC;//, ActiveMessageC;
     components KNoTC, ChannelTableC, ChannelStateC, LEDBlinkC;
 /* Debug */
     #if DEBUG
@@ -12,17 +12,12 @@ implementation
 /* Timers */
     components new TimerMilliC();
 
-/* Radio/Serial*/
-    components new AMSenderC(AM_KNOT_MESSAGE);
-    components new AMReceiverC(AM_KNOT_MESSAGE);
     components new SerialAMSenderC(AM_KNOT_MESSAGE);
     components new SerialAMReceiverC(AM_KNOT_MESSAGE);
 
     ControllerC.Boot -> MainC;
-    ControllerC.RadioControl -> ActiveMessageC;
     ControllerC.SerialControl -> SerialActiveMessageC;
-    ControllerC.AMSend -> AMSenderC;
-    ControllerC.Receive -> AMReceiverC;
+
     ControllerC.SerialSend -> SerialAMSenderC;
     ControllerC.SerialReceive ->SerialAMReceiverC;
     ControllerC.ChannelTable -> ChannelTableC;

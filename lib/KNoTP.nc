@@ -14,19 +14,26 @@
 
 #define SEQNO_START 0
 #define SEQNO_LIMIT 255
+#ifndef DEVICE_NAME
 #define DEVICE_NAME "WHOAMI"
+#endif
+#ifndef SENSOR_TYPE
 #define SENSOR_TYPE 0
+#endif
+#ifndef DATA_RATE
 #define DATA_RATE 10
+#endif
 
 module KNoTP @safe() {
 	provides interface KNoT;
 	uses {
 		interface Boot;
+		//interface Packet;
         interface AMPacket;
+        interface Receive;
         interface AMSend;
         interface SplitControl as RadioControl;
         interface AMSend as SerialAMSend;
-        interface Receive as SerialReceive;
         interface LEDBlink;
 	}
 }
@@ -50,7 +57,12 @@ implementation {
 		uint8_t len = sizeof(PayloadHeader) + sizeof(DataHeader) + dp->dhdr.tlen;
 		DataPayload *payload = (DataPayload *) (call AMSend.getPayload(&am_pkt, sizeof(DataPayload)));
 		memcpy(payload, dp, sizeof(DataPayload));
-		if (call AMSend.send(dest, &am_pkt, len) == SUCCESS) sendBusy = TRUE;
+		//call AMPacket.setSource(&am_pkt, call AMPacket.address());
+		if (call AMSend.send(dest, &am_pkt, len) == SUCCESS) {
+			sendBusy = TRUE;
+			PRINTF("RADIO>> Sent a %s packet\n", cmdnames[dp->hdr.cmd]);		
+			PRINTF("RADIO>> KNoT Payload Length: %d\n", dp->dhdr.tlen);
+		}
 		else {
 			PRINTF("ID: %d, Radio Msg could not be sent, channel busy\n", TOS_NODE_ID);
 			//report_problem();
@@ -104,10 +116,11 @@ implementation {
 /***** QUERY CALLS AND HANDLERS ******/
 	command void KNoT.query(ChanState* state, uint8_t type){
 		DataPayload *new_dp = &(state->packet); 
-		QueryMsg *q = (QueryMsg *) new_dp->data;
+		QueryMsg *q;
 	    clean_packet(new_dp);
 	    dp_complete(new_dp, HOME_CHANNEL, HOME_CHANNEL, 
 	             QUERY, sizeof(QueryMsg));
+	    q = (QueryMsg *) new_dp->data;
 	    q->type = type;
 	    strcpy((char*)q->name, DEVICE_NAME);
 	    call KNoT.knot_broadcast(state, new_dp);
@@ -120,7 +133,7 @@ implementation {
 		DataPayload *new_dp;
 		QueryResponseMsg *qr;
 		QueryMsg *q = (QueryMsg*)(dp->data);
-		if (q->type != SENSOR_TYPE){
+		if (q->type != SENSOR_TYPE) {
 			PRINTF("Query doesn't match type\n");
 			return;
 		}
@@ -129,7 +142,7 @@ implementation {
 		new_dp = &(state->packet);
 		qr = (QueryResponseMsg*)&(new_dp->data);
 		clean_packet(new_dp);
-		strcpy((char*)qr->name, DEVICE_NAME); // copy name
+		strcpy((char*)qr->name, DEVICE_NAME); /* copy name */
 		qr->type = SENSOR_TYPE;
 		qr->rate = DATA_RATE;
 		dp_complete(new_dp, state->chan_num, dp->hdr.src_chan_num, 
@@ -140,18 +153,17 @@ implementation {
 	command void KNoT.qack_handler(ChanState *state, DataPayload *dp, uint8_t src) {
 		SerialQueryResponseMsg *qr;
 		if (state->state != STATE_QUERY) {
-			PRINTF("Not in Query state\n");
+			PRINTF("KNOT>> Not in Query state\n");
 			return;
 		}
 	    state->remote_addr = src; 
-		PRINTF("Query ACK received from Thing: \n");
-		PRINTF("%d\n",state->remote_addr);
+		PRINTF("KNOT>> Query ACK received from Thing: %d\n", state->remote_addr);
 		qr = (SerialQueryResponseMsg *) &dp->data;
 		qr->src = state->remote_addr;
-		PRINTF("%d\n", qr->src);
 		send_on_serial(dp);
 	}
-/*******************/
+
+/*********** CONNECT CALLS AND HANDLERS ********/
 	
 	command void KNoT.connect(ChanState *state, uint8_t addr, int rate){
 		ConnectMsg *cm;
@@ -164,7 +176,7 @@ implementation {
 	             CONNECT, sizeof(ConnectMsg));
 		cm = (ConnectMsg *)(new_dp->data);
 		cm->rate = rate;
-	    PRINTF("Sending connect request\n");
+	    PRINTF("KNOT>> Sending connect request\n");
 	    call KNoT.send_on_chan(state, new_dp);
 	    set_ticks(state, TICKS);
 	    set_state(state, STATE_CONNECT);
@@ -177,16 +189,13 @@ implementation {
 		ConnectACKMsg *ck;
 		state->remote_addr = src;
 		cm = (ConnectMsg*)dp->data;
-		PRINTF("%d wants to connect from channel ", dp->hdr.src_chan_num);
-		PRINTF("Replying on channel %d", state->chan_num);
+		PRINTF("KNOT>> %d wants to connect from channel ", dp->hdr.src_chan_num);
+		PRINTF("KNOT>> Replying on channel %d", state->chan_num);
 		/* Request src must be saved to message back */
 		state->remote_chan_num = dp->hdr.src_chan_num;
-		if (cm->rate > DATA_RATE){
-			state->rate = cm->rate;
-		} else {
-			state->rate = DATA_RATE;
-		}
-		PRINTF("The rate is set to: %d", state->rate);
+		if (cm->rate > DATA_RATE) state->rate = cm->rate;
+		else state->rate = DATA_RATE;
+		PRINTF("KNOT>> The rate is set to: %d", state->rate);
 		new_dp = &(state->packet);
 		ck = (ConnectACKMsg *)&(new_dp->data);
 		clean_packet(new_dp);
@@ -199,33 +208,24 @@ implementation {
 		//state->timer = set_timer(TIMEOUT, state->chan_num, &reliable_retry);
 	}
 
-	command void KNoT.send_rack(ChanState *state){
-		DataPayload *new_dp = &(state->packet);
-		clean_packet(new_dp);
-		dp_complete(new_dp, state->chan_num, state->remote_chan_num, 
-	             RACK, NO_PAYLOAD);
-		call KNoT.send_on_chan(state, new_dp);
-	}
-
 	command uint8_t KNoT.cack_handler(ChanState *state, DataPayload *dp){
 		ConnectACKMsg *ck = (ConnectACKMsg*)(dp->data);
 		DataPayload *new_dp;
 		SerialConnectACKMsg *sck;
 		if (state->state != STATE_CONNECT){
-			PRINTF("Not in Connecting state\n");
+			PRINTF("KNOT>> Not in Connecting state\n");
 			return -1;
 		}
 		if (ck->accept == 0){
-			PRINTF("SCREAM! THEY DIDN'T EXCEPT!!");
+			PRINTF("KNOT>> SCREAM! THEY DIDN'T EXCEPT!!");
 			return 0;
 		}
-		PRINTF("%d accepts connection request on channel.", state->remote_addr);
-		PRINTF("%d\n", dp->hdr.src_chan_num);
+		PRINTF("KNOT>> %d accepts connection request on channel %d\n", 
+			state->remote_addr,
+			dp->hdr.src_chan_num);
 		state->remote_chan_num = dp->hdr.src_chan_num;
-
 		new_dp = &(state->packet);
 		clean_packet(new_dp);
-
 		dp_complete(new_dp, state->chan_num, state->remote_chan_num, 
 	             CACK, NO_PAYLOAD);
 		call KNoT.send_on_chan(state,new_dp);
@@ -239,21 +239,31 @@ implementation {
 		return 1;
 	}
 
+/**** RESPONSE CALLS AND HANDLERS ***/
 	command void KNoT.response_handler(ChanState *state, DataPayload *dp){
 		ResponseMsg *rmsg;
 		SerialResponseMsg *srmsg;
 		if (state->state != STATE_CONNECTED && state->state != STATE_PING){
-			PRINTF("Not connected to device!\n");
+			PRINTF("KNOT>> Not connected to device!\n");
 			return;
 		}
 		set_ticks(state, TICKS); /* RESET PING TIMER */
 		rmsg = (ResponseMsg *)dp->data;
-		PRINTF("Data rvd: %d", rmsg->data);
+		PRINTF("KNOT>> Data rvd: %d", rmsg->data);
 		srmsg = (SerialResponseMsg *)dp->data;
 		srmsg->src = state->remote_addr;
 		send_on_serial(dp);
 	}
 
+	command void KNoT.send_rack(ChanState *state){
+		DataPayload *new_dp = &(state->packet);
+		clean_packet(new_dp);
+		dp_complete(new_dp, state->chan_num, state->remote_chan_num, 
+	             RACK, NO_PAYLOAD);
+		call KNoT.send_on_chan(state, new_dp);
+	}
+
+/*** PING CALLS AND HANDLERS ***/
 	command void KNoT.ping(ChanState *state){
 		DataPayload *new_dp = &(state->packet);
 		clean_packet(new_dp);
@@ -266,10 +276,9 @@ implementation {
 	command void KNoT.ping_handler(ChanState *state, DataPayload *dp){
 		DataPayload *new_dp;
 		if (state->state != STATE_CONNECTED) {
-			PRINTF("Not in Connected state\n");
+			PRINTF("KNOT>> Not in Connected state\n");
 			return;
 		}
-		PRINTF("PINGing back\n");
 		new_dp = &(state->packet);
 		clean_packet(new_dp);
 		dp_complete(new_dp, state->chan_num, state->remote_chan_num, 
@@ -279,17 +288,18 @@ implementation {
 
 	command void KNoT.pack_handler(ChanState *state, DataPayload *dp){
 		if (state->state != STATE_PING) {
-			PRINTF("Not in PING state\n");
+			PRINTF("KNOT>> Not in PING state\n");
 			return;
 		}
 		state->state = STATE_CONNECTED;
 
 	}
 
+/*** DISCONNECT CALLS AND HANDLERS ***/
 	command void KNoT.close_graceful(ChanState *state){
 		DataPayload *new_dp;
 		if (state->state != STATE_CONNECTED) {
-			PRINTF("Not in Connected state\n");
+			PRINTF("KNOT>> Not in Connected state\n");
 			return;
 		}
 		new_dp = &(state->packet);
@@ -302,7 +312,6 @@ implementation {
 
 	command void KNoT.close_handler(ChanState *state, DataPayload *dp){
 		DataPayload *new_dp = &(state->packet);
-	  	PRINTF("Sending CLOSE ACK...\n");
 		clean_packet(new_dp);
 		dp_complete(new_dp, state->chan_num, state->remote_chan_num, 
 	               DACK, NO_PAYLOAD);
@@ -313,28 +322,32 @@ implementation {
 /*--------------------------- EVENTS ------------------------------------------------*/
    event void Boot.booted() {
         if (call RadioControl.start() != SUCCESS) {
-        	PRINTF("ERROR BOOTING RADIO\n");
+        	PRINTF("RADIO>> ERROR BOOTING RADIO\n");
         	PRINTFFLUSH();
         }
     }
+
 /*-----------Radio & AM EVENTS------------------------------- */
     event void RadioControl.startDone(error_t error) {
-    	PRINTF("*********************\n****** Radio BOOTED *******\n*********************\n");
+    	PRINTF("***********\n**** Radio BOOTED ****\n*************\n");
+    	PRINTF("RADIO>> ADDR: %d\n", call AMPacket.address());
         PRINTFFLUSH();
     }
 
     event void RadioControl.stopDone(error_t error) {}
+	
+	event message_t* Receive.receive(message_t* msg, void* payload, uint8_t len) {
+		return signal KNoT.receive(call AMPacket.source(msg), msg, payload, len);
+	}
 
     event void AMSend.sendDone(message_t* msg, error_t error) {
-        //if (error == SUCCESS) report_sent();
-        //else report_problem();
-
+        if (error == SUCCESS) {
+        	call LEDBlink.report_sent();
+        	PRINTF("RADIO>> Packet sent successfully\n");
+        } else call LEDBlink.report_problem();
         sendBusy = FALSE;
     }
 
-    event message_t* SerialReceive.receive(message_t* msg, void* payload, uint8_t len) {
-    	return msg;
-    }
     event void SerialAMSend.sendDone(message_t* msg, error_t error) {
     //if (error == SUCCESS)
         //report_sent();
