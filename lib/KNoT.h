@@ -15,7 +15,7 @@
 #define TICKS 2 /* initial number of 20ms ticks before first retry
                  * number of ticks is doubled for each successive retry */
 #define TICKS_TILL_PING (60 * 50) /* 60s * (50ms * 20ms) = 1 minute */
-
+#define RSYN_RATE 15 /* Rate to send out a RSYN message */ 
 /* Memsets a Datapayload */
 #define clean_packet(dp) (memset(dp, '\0', sizeof(DataPayload)))
 

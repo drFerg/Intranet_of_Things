@@ -87,7 +87,7 @@ typedef nx_struct cack{
 }ConnectACKMsg;
 
 typedef nx_struct response{
-   nx_uint16_t data;
+   nx_uint8_t data[MAX_DATA_SIZE];
 }ResponseMsg;
 
 typedef nx_struct serial_query_response{

@@ -24,12 +24,7 @@ module ControllerC @safe()
 {
     uses {
         interface Boot;
-       	//interface Packet;
-        //interface AMPacket;
-        //interface SplitControl as RadioControl;
         interface SplitControl as SerialControl;
-        //interface AMSend;
-        //interface Receive;
         interface AMSend as SerialSend;
         interface Receive as SerialReceive;
         interface Timer<TMilli>;
@@ -48,7 +43,7 @@ implementation
 	/*------------------------------------------------- */
 	
 	event void Boot.booted() {
-		PRINTF("*********************\n****** BOOTED *******\n*********************\n");
+		PRINTF("\n*********************\n****** BOOTED *******\n*********************\n");
         PRINTFFLUSH();
         call ChannelTable.init_table();
         call ChannelState.init_state(&home_chan, 0);
@@ -57,17 +52,13 @@ implementation
  	event void SerialControl.startDone(error_t error) {}
 
     event void SerialControl.stopDone(error_t error) {}
-
-
    
 /*-----------Received packet event, main state event ------------------------------- */
     event message_t* KNoT.receive(uint8_t src, message_t* msg, void* payload, uint8_t len) {
     	ChanState *state;
         DataPayload *dp = (DataPayload *) payload;
 		/* Gets data from the connection */
-		//if (!src) return; /* The cake was a lie */
-	    uint8_t cmd = dp->hdr.cmd;
-	    PRINTF("message size: %d\n", sizeof(message_t));
+		uint8_t cmd = dp->hdr.cmd;
 		PRINTF("CON>> Received packet from Thing: %d\n", src);
 		PRINTF("CON>> Data is %d bytes long\n", dp->dhdr.tlen);
 		PRINTF("CON>> Received a %s command\n", cmdnames[cmd]);
@@ -75,9 +66,10 @@ implementation
 		PRINTFFLUSH();
 
 		switch(cmd) { /* Drop packets for cmds we don't accept */
-	        case(QUERY):   PRINTF("NOT FOR US\n");PRINTFFLUSH();return msg;
+	        case(QUERY): PRINTF("NOT FOR US\n");PRINTFFLUSH(); return msg;
 	        case(CONNECT): return msg;
-	        case(QACK):    call KNoT.qack_handler(&home_chan, dp, src);return msg;
+	        case(QACK): call KNoT.qack_handler(&home_chan, dp, src); return msg;
+	        case(DACK): return msg;
     	}
 	    /* Grab state for requested channel */
 		state = call ChannelTable.get_channel_state(dp->hdr.dst_chan_num);
@@ -86,23 +78,24 @@ implementation
 			state = &home_chan;
 			state->remote_chan_num = dp->hdr.src_chan_num;
 			state->remote_addr = src;
-			//close_graceful(state);
+			state->seqno = dp->hdr.seqno;
+			call KNoT.close_graceful(state);
 			return msg;
 		} else if (!call KNoT.valid_seqno(state, dp)) {
 			PRINTF("Old packet\n");
 			return msg;
 		}
-
+		PRINTF("Running appropriate function...\n");PRINTFFLUSH();
 		switch(cmd) {
-			case(CACK):     	call KNoT.cack_handler(state, dp);            break;
-			case(RESPONSE): 	call KNoT.response_handler(state, dp);        break;
-			case(RSYN):		 	call KNoT.response_handler(state, dp); call KNoT.send_rack(state); break;
+			case(CACK): call KNoT.controller_cack_handler(state, dp); break;
+			case(RESPONSE): call KNoT.response_handler(state, dp); break;
+			case(RSYN): call KNoT.response_handler(state, dp); call KNoT.send_rack(state); break;
 			// case(CMDACK):   	command_ack_handler(state,dp);break;
-			case(PING):     	call KNoT.ping_handler(state, dp);            break;
-			case(PACK):     	call KNoT.pack_handler(state, dp);            break;
-			//case(DISCONNECT):   call KNoT.disconnect_handler(state, dp, src); break;
-	        case(DACK):                                              break;
-			default: 			PRINTF("Unknown CMD type\n");
+			case(PING): call KNoT.ping_handler(state, dp); break;
+			case(PACK): call KNoT.pack_handler(state, dp); break;
+			case(DISCONNECT): call KNoT.disconnect_handler(state); 
+							  call ChannelTable.remove_channel(state->chan_num); break;
+			default: PRINTF("Unknown CMD type\n");
 		}
 		PRINTF("%s\n", "FINISHED.");
         call LEDBlink.report_received();
@@ -110,13 +103,9 @@ implementation
         return msg; /* Return packet to TinyOS */
     }
     
-   
-/*
-    event void AMSend.sendDone(message_t* msg, error_t error) {
-    }
-*/
 	event message_t *SerialReceive.receive(message_t *msg, void* payload, uint8_t len){
     	DataPayload *dp = (DataPayload *)payload;
+    	void * data = &(dp->data);
     	uint8_t cmd = dp->hdr.cmd;
     	call LEDBlink.report_received();
 		
@@ -129,8 +118,8 @@ implementation
 		switch (cmd) {
 			case(QUERY): call KNoT.query(&home_chan, 1/*((QueryMsg*)dp)->type*/);break;
 			case(CONNECT): call KNoT.connect(call ChannelTable.new_channel(), 
-													((SerialConnect*)dp)->addr, 
-													((SerialConnect*)dp)->rate);break;
+													((SerialConnect*)data)->addr, 
+													((SerialConnect*)data)->rate);break;
 		}
 		call LEDBlink.report_received();
     	return msg;

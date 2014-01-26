@@ -19,7 +19,11 @@ interface KNoT{
 
 	command void connect_handler(ChanState *state, DataPayload *dp, uint8_t src);
 
-	command uint8_t cack_handler(ChanState *state, DataPayload *dp);
+	command uint8_t controller_cack_handler(ChanState *state, DataPayload *dp);
+
+	command uint8_t sensor_cack_handler(ChanState *state, DataPayload *dp);
+
+	command void send_value(ChanState *state, uint8_t *data, uint8_t len);
 
 	command void response_handler(ChanState *state, DataPayload *dp);
 	
@@ -38,7 +42,7 @@ interface KNoT{
 	command void close_graceful(ChanState *state);
 
 	/* Handles the reception of a DISCONNECT packet */
-	command void close_handler(ChanState *state, DataPayload *dp);
+	command void disconnect_handler(ChanState *state);
 
 	event message_t* receive(uint8_t src, message_t *msg, void *payload, uint8_t len);
 }

@@ -2,7 +2,7 @@
 configuration ControllerAppC { }
 implementation
 {
-    components ControllerC, MainC, SerialStartC, SerialActiveMessageC;//, ActiveMessageC;
+    components ControllerC, MainC, SerialStartC, SerialActiveMessageC;
     components KNoTC, ChannelTableC, ChannelStateC, LEDBlinkC;
 /* Debug */
     #if DEBUG

@@ -10,7 +10,7 @@ public class KNoTClient implements MessageListener
 
     MoteIF mote;
     int MYID = 0;
-    int MOTEID = 0;
+    int MOTEID = 1;
     short seqno = 1;
 
     private void cli(){
@@ -18,8 +18,11 @@ public class KNoTClient implements MessageListener
         System.out.print(">>");
         String command = input.next();
         while (!command.equals("quit")){
-            if (command.equals("q")){
+            if (command.equals("q") || command.equals("query")){
                 query();
+            }
+            else if (command.equals("c") || command.equals("connect")){
+                connect(input.nextInt(), input.nextInt());
             }
             else if (command.equals("help")){
                 System.out.println("Help:\n" +
@@ -72,7 +75,20 @@ public class KNoTClient implements MessageListener
         msg.set_dhdr_tlen((short) 17);
         msg.set_data(convertStringToShort("1Client\0"));
         sendMsg(msg);
+    }
 
+    void connect(int addr, int rate){
+        System.out.println("Initiating connection to " + addr + " at " + rate);
+        DataPayloadMsg msg = new DataPayloadMsg();
+        msg.set_hdr_src_chan_num((short) 0);
+        msg.set_hdr_dst_chan_num((short) 0);
+        msg.set_hdr_seqno((short) 0);
+        msg.set_hdr_cmd((short) 3);
+        msg.set_hdr_chksum((short) 0);
+        msg.set_dhdr_tlen((short) 2);
+        short data[] = {(short)addr, (short)rate};
+        msg.set_data(data);
+        sendMsg(msg);
     }
     // void getTweets(){
     //     System.out.printf("Node %d: Getting tweets...\n",MOTEID);
@@ -154,7 +170,8 @@ public class KNoTClient implements MessageListener
             mote.send(MOTEID, msg);
         }
         catch (IOException e) {
-            //System.err.out("Cannot send message to mote");
+            System.out.println(e.getMessage());
+            System.out.println("Cannot send message to mote");
         }
     }
 
