@@ -27,7 +27,7 @@ module ControllerC @safe()
         interface SplitControl as SerialControl;
         interface AMSend as SerialSend;
         interface Receive as SerialReceive;
-        interface Timer<TMilli>;
+        interface Timer<TMilli> as CleanerTimer;
         interface LEDBlink;
         interface ChannelTable;
         interface ChannelState;
@@ -39,14 +39,48 @@ implementation
 	ChanState home_chan;
 	bool serialSendBusy = FALSE;
 
+		/* Checks the timer for a channel's state, retransmitting when necessary */
+	void check_timer(ChanState *state) {
+	    decrement_ticks(state);
+	    if (ticks_left(state)) return;
+	    if (attempts_left(state)) {
+        	if (in_waiting_state(state))
+        		call KNoT.send_on_chan(state, &(state->packet));
+            else 
+            	call KNoT.ping(state); /* PING A LING LONG */
+            set_ticks(state, state->ticks * 2); /* Exponential (double) retransmission */
+            decrement_attempts(state);
+            PRINTF("CLN>> Attempts left %d\n", state->attempts_left);
+            PRINTF("CLN>> Retrying packet...\n");
+	    } else {
+	        PRINTF("CLN>> CLOSING CHANNEL DUE TO TIMEOUT\n");
+            call KNoT.close_graceful(state);
+            call ChannelTable.remove_channel(state->chan_num);
+	    }
+	}
+
+	/* Run once every 20ms */
+	void cleaner(){
+		ChanState *state;
+		int i = 1;
+	    for (; i < CHANNEL_NUM; i++) {
+	    	state = call ChannelTable.get_channel_state(i);
+	        if (state) check_timer(state);
+	    }
+	    /*if (home_channel_state.state != STATE_IDLE) {
+	            check_timer(&home_channel_state);
+	    }*/
+	}
       
 	/*------------------------------------------------- */
 	
 	event void Boot.booted() {
 		PRINTF("\n*********************\n****** BOOTED *******\n*********************\n");
         PRINTFFLUSH();
+        call LEDBlink.report_problem();
         call ChannelTable.init_table();
         call ChannelState.init_state(&home_chan, 0);
+        call CleanerTimer.startPeriodic(TICK_RATE);
     }
     
  	event void SerialControl.startDone(error_t error) {}
@@ -73,7 +107,7 @@ implementation
 	    /* Grab state for requested channel */
 		state = call ChannelTable.get_channel_state(dp->hdr.dst_chan_num);
 		if (!state){ /* Attempt to kill connection if no state held */
-			PRINTF("Channel ");PRINTF("%d", dp->hdr.dst_chan_num);PRINTF(" doesn't exist\n");
+			PRINTF("Channel %d doesn't exist\n", dp->hdr.dst_chan_num);
 			state = &home_chan;
 			state->remote_chan_num = dp->hdr.src_chan_num;
 			state->remote_addr = src;
@@ -129,7 +163,8 @@ implementation
     }
 
    
-
-    event void Timer.fired(){
+    event void CleanerTimer.fired(){
+    	cleaner();
     }
+
 }

@@ -48,6 +48,7 @@ implementation
 	event void Boot.booted() {
 		PRINTF("*********************\n****** BOOTED *******\n*********************\n");
         PRINTFFLUSH();
+        call LEDBlink.report_problem();
         call ChannelTable.init_table();
         call ChannelState.init_state(&home_chan, 0);
         //call Timer.startOneShot(5000);
@@ -74,16 +75,18 @@ implementation
         switch(cmd){
             case(QUERY): call KNoT.query_handler(&home_chan, dp, src); return msg;
             case(CONNECT): call KNoT.connect_handler(call ChannelTable.new_channel(), dp, src); return msg;
+            case(DACK): return msg;
         }
 
         /* Grab state for requested channel */
         state = call ChannelTable.get_channel_state(dp->hdr.dst_chan_num);
         /* Always allow disconnections to prevent crazies */
         if (!state){ /* Attempt to kill connection if no state held */
-            PRINTF("Channel ");PRINTF("%d", dp->hdr.dst_chan_num);PRINTF(" doesn't exist\n");
+            PRINTF("Channel %d doesn't exist\n", dp->hdr.dst_chan_num);
             state = &home_chan;
             state->remote_chan_num = dp->hdr.src_chan_num;
             state->remote_addr = src;
+            state->seqno = dp->hdr.seqno;
             call KNoT.close_graceful(state);
             return msg;
         } else if (!call KNoT.valid_seqno(state, dp)) {
@@ -106,8 +109,6 @@ implementation
     }
 
     event void Timer.fired(){
-        uint8_t data[] = {55};
-        //call KNoT.send_value(call ChannelTable.get_channel_state(1), data, 1);
         call TempSensor.read();
     }
 

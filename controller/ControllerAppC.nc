@@ -21,7 +21,7 @@ implementation
     ControllerC.SerialReceive ->SerialAMReceiverC;
     ControllerC.ChannelTable -> ChannelTableC;
     ControllerC.ChannelState -> ChannelStateC;
-    ControllerC.Timer -> TimerMilliC;
+    ControllerC.CleanerTimer -> TimerMilliC;
     ControllerC.LEDBlink -> LEDBlinkC;
     ControllerC.KNoT -> KNoTC;
 

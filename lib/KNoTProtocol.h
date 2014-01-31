@@ -37,14 +37,16 @@
 
 /* =======================*/
 
+/* Macro signifying payload of 0 length */
+#define NO_PAYLOAD     0
 #define MAX_DATA_SIZE 32
 #define RESPONSE_DATA_SIZE 16
 #define NAME_SIZE     16
 
-const char *cmdnames[16] = {"", "QUERY", "QACK","CONNECT", "CACK", 
-                                 "RESPONSE", "RACK", "DISCONNECT", "DACK",
+const char *cmdnames[17] = {"DUMMY", "QUERY", "QACK","CONNECT", "CACK", 
+                                 "RSYN", "RACK", "DISCONNECT", "DACK",
                                  "COMMAND", "COMMANDACK", "PING", "PACK", "SEQNO",
-                                 "SEQACK", "RSYN"};
+                                 "SEQACK", "DUMMY", "RESPONSE"};
 
 typedef nx_struct payload_header {
    nx_uint8_t src_chan_num;

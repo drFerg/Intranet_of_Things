@@ -8,7 +8,7 @@ implementation {
 	components ActiveMessageC;
 	components LEDBlinkC;
 	components KNoTP;
-    components new TimerMilliC();
+
     components new AMSenderC(AM_KNOT_MESSAGE);
     components new AMReceiverC(AM_KNOT_MESSAGE);
 
@@ -18,6 +18,5 @@ implementation {
     KNoTP.AMSend -> AMSenderC;
     KNoTP.AMPacket ->AMSenderC;
     KNoTP.Receive -> AMReceiverC;
-    ControllerC.CleanerTimer -> TimerMilliC;
     KNoTP.LEDBlink -> LEDBlinkC;
 }

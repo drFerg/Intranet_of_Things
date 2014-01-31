@@ -11,6 +11,8 @@ module ChannelTableC {
 implementation {
 	static Channel channelTable[CHANNEL_NUM];
 	static Channel *nextFree;
+	static Channel *iterCurrent;
+	static Channel *iterStart;
 	uint8_t size;
 
 	void init_state(ChanState *state, uint8_t chan_num){
@@ -44,14 +46,17 @@ implementation {
 		temp = nextFree;
 		temp->active = 1;
 		nextFree = temp->nextChannel;
-		temp->nextChannel = NULL;
 		size++;
+		if (iterStart) {
+			temp->nextChannel = iterStart;
+			iterStart = temp;
+		}
 		return &(temp->state);
 	}
 
 	/* 
 	 * get the channel state for the given channel number
-	 * return 1 if successful, 0 otherwise
+	 * return channel if successful, NULL otherwise
 	 */
 	command ChanState* ChannelTable.get_channel_state(int channel){
 		if (channelTable[channel-1].active){
@@ -63,11 +68,24 @@ implementation {
 	 * (scrubs and frees space in table for a new channel)
 	 */
 	command void ChannelTable.remove_channel(int channel){
-		channelTable[channel-1].nextChannel = nextFree;
-		init_state(&(channelTable[channel-1].state),channel);
-		channelTable[channel-1].active = 0;
-		nextFree = &channelTable[channel-1];
+		Channel *next;
+		Channel * chan = &(channelTable[channel-1]);
+		chan->nextChannel = nextFree;
+		init_state(&(chan->state), channel);
+		chan->active = 0;
+		nextFree = chan;
 		size--;
+		if (iterStart == chan){
+			iterStart = chan->nextChannel;
+		} else {
+			next = iterStart;
+			while (next){
+				if (next->nextChannel == chan){
+					next->nextChannel = chan->nextChannel;
+					return;
+				}
+			}
+		}
 	}
 
 	/* 

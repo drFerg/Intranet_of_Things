@@ -33,7 +33,6 @@ module KNoTP @safe() {
         interface AMSend;
         interface SplitControl as RadioControl;
         interface LEDBlink;
-        interface MilliTimer as CleanerTimer;
 	}
 }
 implementation {
@@ -41,7 +40,6 @@ implementation {
 	message_t serial_pkt;
 	bool serialSendBusy = FALSE;
 	bool sendBusy = FALSE;
-
 
 	void increment_seq_no(ChanState *state, DataPayload *dp){
 		if (state->seqno >= SEQNO_LIMIT){
@@ -113,7 +111,7 @@ implementation {
 	    q->type = type;
 	    strcpy((char*)q->name, DEVICE_NAME);
 	    call KNoT.knot_broadcast(state, new_dp);
-	    //set_ticks(state, TICKS);
+	    set_ticks(state, TICKS);
 	    set_state(state, STATE_QUERY);
 	    // Set timer to exit Query state after 5 secs~
 	}
@@ -166,6 +164,7 @@ implementation {
 		cm->rate = rate;
 	    call KNoT.send_on_chan(state, new_dp);
 	    set_ticks(state, TICKS);
+	    set_attempts(state, ATTEMPTS);
 	    set_state(state, STATE_CONNECT);
 	   	PRINTF("KNOT>> Sent connect request from chan %d\n", state->chan_num);
 	    PRINTFFLUSH();
@@ -189,8 +188,11 @@ implementation {
 					CACK, sizeof(ConnectACKMsg));
 		ck->accept = 1;
 		call KNoT.send_on_chan(state, new_dp);
+		set_ticks(state, TICKS);
+		set_attempts(state, ATTEMPTS);
 		set_state(state, STATE_CONNECT);
 		PRINTF("KNOT>> %d wants to connect from channel %d\n", src, state->remote_chan_num);
+		PRINTFFLUSH();
 		PRINTF("KNOT>> Replying on channel %d\n", state->chan_num);
 		PRINTF("KNOT>> The rate is set to: %d\n", state->rate);
 		PRINTFFLUSH();
@@ -219,7 +221,8 @@ implementation {
 		dp_complete(new_dp, state->chan_num, state->remote_chan_num, 
 	             CACK, NO_PAYLOAD);
 		call KNoT.send_on_chan(state,new_dp);
-		set_ticks(state, TICKS);
+		set_ticks(state, ticks_till_ping(state->rate));
+		set_attempts(state, ATTEMPTS);
 		set_state(state, STATE_CONNECTED);
 		//Set up ping timeouts for liveness if no message received or
 		// connected to actuator
@@ -236,7 +239,7 @@ implementation {
 		}
 		//Disable timer now that message has been received successfully
 		//remove_timer(state->timer);
-		state->ticks = RSYN_RATE;
+		set_ticks(state, RSYN_RATE);
 		PRINTF("KNOT>> TX rate: %d\n", state->rate);
 		// Setup sensor polling
 		//state->timer = set_timer(state->rate, state->chan_num, &send_handler);
@@ -283,7 +286,8 @@ implementation {
 			PRINTF("KNOT>> Not connected to device!\n");
 			return;
 		}
-		set_ticks(state, TICKS); /* RESET PING TIMER */
+		set_ticks(state, ticks_till_ping(state->rate)); /* RESET PING TIMER */
+		set_attempts(state, ATTEMPTS);
 		rmsg = (ResponseMsg *)dp->data;
 		memcpy(&temp, &(rmsg->data), 1);
 		PRINTF("KNOT>> Data rvd: %d\n", temp);
@@ -330,7 +334,8 @@ implementation {
 			return;
 		}
 		state->state = STATE_CONNECTED;
-
+		set_ticks(state, ticks_till_ping(state->rate));
+		set_attempts(state, ATTEMPTS);
 	}
 
 /*** DISCONNECT CALLS AND HANDLERS ***/
@@ -380,44 +385,6 @@ implementation {
         sendBusy = FALSE;
     }
 
-    event void CleanerTimer.fired(){
-    	cleaner();
-    }
 
-	/* Checks the timer for a channel's state, retransmitting when necessary */
-	void check_timer(ChanState *state) {
-	    if (state == NULL) return;
-	    if (in_waiting_state(state)) {
-	        if (ticks_left(state) && attempts_left(state)) {
-	        	PRINTF("Retrying\n");
-	            call KNoT.send_on_chan(state, &(state->packet));
-	            set_ticks(state, state->ticks * 2); /* Exponential (double) retransmission */
-	        }
-	        else {
-	        	PRINTF("CLOSING CHANNEL DUE TO TIMEOUT\n");
-	            call KNoT.close_graceful(state);
-	            call ChannelTable.remove_channel(state->chan_num);
-	        }
-	    } else { /* Connection idling */
-	   		if (--state->ticks_till_ping <= 0) {
-	   			call KNot.ping(state); /* PING A LING LONG */
-	   			set_ticks(state, TICKS);
-	        } else {
-	        	PRINTF("CLOSING CHANNEL DUE TO TIMEOUT\n");
-	            call KNoT.close_graceful(state);
-	            call ChannelTable.remove_channel(state->chan_num);
-	        }
-	    }
-	}
 
-	/* Run once every 20ms */
-	void cleaner(){
-		PRINT("Cleaning\n");
-	    for (int i = 1; i < CHANNEL_NUM; i++) {
-	            check_timer(call ChannelTable.get_channel_state(i));
-	    }
-	    if (home_channel_state.state != STATE_IDLE) {
-	            check_timer(&home_channel_state);
-	    }
-	}
 }
