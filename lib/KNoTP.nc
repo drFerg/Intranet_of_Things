@@ -28,13 +28,12 @@ module KNoTP @safe() {
 	provides interface KNoT;
 	uses {
 		interface Boot;
-		//interface Packet;
-        interface AMPacket;
+	    interface AMPacket;
         interface Receive;
         interface AMSend;
         interface SplitControl as RadioControl;
-        interface AMSend as SerialAMSend;
         interface LEDBlink;
+        interface MilliTimer as CleanerTimer;
 	}
 }
 implementation {
@@ -68,17 +67,6 @@ implementation {
 			call LEDBlink.report_problem();
 		}
 		PRINTFFLUSH();
-	}
-
-	void send_on_serial(DataPayload *dp){
-		DataPayload *pkt = (DataPayload *) (call SerialAMSend.getPayload(&serial_pkt, sizeof(DataPayload)));
-		memcpy(pkt, dp, sizeof(DataPayload));
-		if (call SerialAMSend.send(0, &serial_pkt, sizeof(DataPayload)) == SUCCESS){
-			serialSendBusy = TRUE;
-		} else {
-			PRINTF("Couldn't send serial pkt\n");
-			call LEDBlink.report_problem();
-		}
 	}
 
 	void dp_complete(DataPayload *dp, uint8_t src, uint8_t dst, 
@@ -158,11 +146,9 @@ implementation {
 			return;
 		}
 	    state->remote_addr = src; 
-		PRINTF("KNOT>> Query ACK received from Thing: %d\n", state->remote_addr);
-		PRINTFFLUSH();
-		qr = (SerialQueryResponseMsg *) &dp->data;
-		qr->src = state->remote_addr;
-		send_on_serial(dp);
+		//qr = (SerialQueryResponseMsg *) &dp->data;
+		//qr->src = state->remote_addr;
+		//send_on_serial(dp);
 	}
 
 /*********** CONNECT CALLS AND HANDLERS ********/
@@ -203,7 +189,7 @@ implementation {
 					CACK, sizeof(ConnectACKMsg));
 		ck->accept = 1;
 		call KNoT.send_on_chan(state, new_dp);
-		state->state = STATE_CONNECT;
+		set_state(state, STATE_CONNECT);
 		PRINTF("KNOT>> %d wants to connect from channel %d\n", src, state->remote_chan_num);
 		PRINTF("KNOT>> Replying on channel %d\n", state->chan_num);
 		PRINTF("KNOT>> The rate is set to: %d\n", state->rate);
@@ -237,9 +223,9 @@ implementation {
 		set_state(state, STATE_CONNECTED);
 		//Set up ping timeouts for liveness if no message received or
 		// connected to actuator
-		sck = (SerialConnectACKMsg *) ck;
-		sck->src = state->remote_addr;
-		send_on_serial(dp);
+		//sck = (SerialConnectACKMsg *) ck;
+		//sck->src = state->remote_addr;
+		//send_on_serial(dp);
 		return 1;
 	}
 
@@ -302,9 +288,9 @@ implementation {
 		memcpy(&temp, &(rmsg->data), 1);
 		PRINTF("KNOT>> Data rvd: %d\n", temp);
 		PRINTF("Temp: %d\n", temp);
-		srmsg = (SerialResponseMsg *)dp->data;
-		srmsg->src = state->remote_addr;
-		send_on_serial(dp);
+		//srmsg = (SerialResponseMsg *)dp->data;
+		//srmsg->src = state->remote_addr;
+		//send_on_serial(dp);
 	}
 
 	command void KNoT.send_rack(ChanState *state){
@@ -394,12 +380,44 @@ implementation {
         sendBusy = FALSE;
     }
 
-    event void SerialAMSend.sendDone(message_t* msg, error_t error) {
-    //if (error == SUCCESS)
-        //report_sent();
-   // else
-        //report_problem();
-
-    sendBusy = FALSE;
+    event void CleanerTimer.fired(){
+    	cleaner();
     }
+
+	/* Checks the timer for a channel's state, retransmitting when necessary */
+	void check_timer(ChanState *state) {
+	    if (state == NULL) return;
+	    if (in_waiting_state(state)) {
+	        if (ticks_left(state) && attempts_left(state)) {
+	        	PRINTF("Retrying\n");
+	            call KNoT.send_on_chan(state, &(state->packet));
+	            set_ticks(state, state->ticks * 2); /* Exponential (double) retransmission */
+	        }
+	        else {
+	        	PRINTF("CLOSING CHANNEL DUE TO TIMEOUT\n");
+	            call KNoT.close_graceful(state);
+	            call ChannelTable.remove_channel(state->chan_num);
+	        }
+	    } else { /* Connection idling */
+	   		if (--state->ticks_till_ping <= 0) {
+	   			call KNot.ping(state); /* PING A LING LONG */
+	   			set_ticks(state, TICKS);
+	        } else {
+	        	PRINTF("CLOSING CHANNEL DUE TO TIMEOUT\n");
+	            call KNoT.close_graceful(state);
+	            call ChannelTable.remove_channel(state->chan_num);
+	        }
+	    }
+	}
+
+	/* Run once every 20ms */
+	void cleaner(){
+		PRINT("Cleaning\n");
+	    for (int i = 1; i < CHANNEL_NUM; i++) {
+	            check_timer(call ChannelTable.get_channel_state(i));
+	    }
+	    if (home_channel_state.state != STATE_IDLE) {
+	            check_timer(&home_channel_state);
+	    }
+	}
 }

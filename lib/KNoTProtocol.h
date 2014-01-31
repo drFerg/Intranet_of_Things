@@ -19,7 +19,7 @@
 #define QACK     2
 #define CONNECT  3
 #define CACK     4
-#define RESPONSE 5
+#define RSYN     5
 #define RACK     6
 #define DISCONNECT 7
 #define DACK     8
@@ -29,11 +29,11 @@
 #define PACK    12
 #define SEQNO   13
 #define SEQACK  14
-#define RSYN    15
+#define RESPONSE 16
 
 
 #define CMD_LOW QUERY
-#define CMD_HIGH RSYN		/* change this if commands added */
+#define CMD_HIGH RESPONSE		/* change this if commands added */
 
 /* =======================*/
 

@@ -11,7 +11,6 @@ implementation
 
 /* Timers */
     components new TimerMilliC();
-
     components new SerialAMSenderC(AM_KNOT_MESSAGE);
     components new SerialAMReceiverC(AM_KNOT_MESSAGE);
 

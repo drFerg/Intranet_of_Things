@@ -21,6 +21,8 @@
 
 /* Returns 1 if a channel is waiting for a reply message, 0 otherwise */
 #define in_waiting_state(chanstate) (chanstate->state % 2 != 0)
+#define ticks_left(chanstate) (chanstate->ticks_left > 0)
+#define tries_left(chanstate) (chanstate->attempts_left > 0)
 
 typedef struct channel_state{
    uint8_t remote_addr; //Holds address of remote device
@@ -28,12 +30,11 @@ typedef struct channel_state{
    uint8_t seqno;
    uint8_t chan_num;
    uint8_t remote_chan_num;
+   uint16_t rate;
    uint8_t ticks;
    uint8_t ticks_left;
-   uint16_t rate;
    uint8_t ticks_till_ping;
    uint8_t attempts_left;
-   uint8_t timer;
    DataPayload packet;
 }ChanState;
 

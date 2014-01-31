@@ -138,7 +138,10 @@ public class KNoTClient implements MessageListener
 
     public synchronized void messageReceived(int dest_addr, Message msg) {
         if (msg instanceof DataPayloadMsg) {
-            System.out.println("received a packet");
+            System.out.println("Received a packet");
+            if (msg.get_hdr_cmd() == 5){
+                System.out.println("Received data: Temp is: " + )
+            }
         }
         // if (msg instanceof TinyBlogMsg) {
         //     TinyBlogMsg tbmsg = (TinyBlogMsg)msg;

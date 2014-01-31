@@ -60,7 +60,6 @@ implementation
 		/* Gets data from the connection */
 		uint8_t cmd = dp->hdr.cmd;
 		PRINTF("CON>> Received packet from Thing: %d\n", src);
-		PRINTF("CON>> Data is %d bytes long\n", dp->dhdr.tlen);
 		PRINTF("CON>> Received a %s command\n", cmdnames[cmd]);
 		PRINTF("CON>> Message for channel %d\n", dp->hdr.dst_chan_num);
 		PRINTFFLUSH();
@@ -85,7 +84,6 @@ implementation
 			PRINTF("Old packet\n");
 			return msg;
 		}
-		PRINTF("Running appropriate function...\n");PRINTFFLUSH();
 		switch(cmd) {
 			case(CACK): call KNoT.controller_cack_handler(state, dp); break;
 			case(RESPONSE): call KNoT.response_handler(state, dp); break;
@@ -97,9 +95,7 @@ implementation
 							  call ChannelTable.remove_channel(state->chan_num); break;
 			default: PRINTF("Unknown CMD type\n");
 		}
-		PRINTF("%s\n", "FINISHED.");
         call LEDBlink.report_received();
-        PRINTF("----------\n");PRINTFFLUSH();
         return msg; /* Return packet to TinyOS */
     }
     
