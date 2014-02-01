@@ -10,7 +10,8 @@ implementation
     #endif
 
 /* Timers */
-    components new TimerMilliC();
+    components new TimerMilliC(), 
+    new TimerMilliC() as Cleaner;
 
 /* Sensors */
     #if TELOS
@@ -26,6 +27,7 @@ implementation
     SensorC.ChannelTable -> ChannelTableC;
     SensorC.ChannelState -> ChannelStateC;
     SensorC.Timer -> TimerMilliC;
+    SensorC.CleanerTimer -> Cleaner;
     SensorC.LightSensor -> LightSensor;
     #if TELOS
     SensorC.TempSensor -> TempSensor.Temperature;

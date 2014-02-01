@@ -196,8 +196,6 @@ implementation {
 		PRINTF("KNOT>> Replying on channel %d\n", state->chan_num);
 		PRINTF("KNOT>> The rate is set to: %d\n", state->rate);
 		PRINTFFLUSH();
-		// Set up timer to ensure reliability
-		//state->timer = set_timer(TIMEOUT, state->chan_num, &reliable_retry);
 	}
 
 	command uint8_t KNoT.controller_cack_handler(ChanState *state, DataPayload *dp){
@@ -237,18 +235,10 @@ implementation {
 			PRINTF("KNOT>> Not in Connecting state\n");
 			return 0;
 		}
-		//Disable timer now that message has been received successfully
-		//remove_timer(state->timer);
-		set_ticks(state, RSYN_RATE);
+		set_ticks(state, ticks_till_ping(state->rate));
 		PRINTF("KNOT>> TX rate: %d\n", state->rate);
-		// Setup sensor polling
-		//state->timer = set_timer(state->rate, state->chan_num, &send_handler);
-		//if (state->timer == -1){
-		//	PRINT(F("ERROR>> Setting sensor timer failed!!\n"));
-		//}// Shouldn't happen...
-
-		PRINTF("KNOT>> CONNECTION FULLY ESTABLISHED<<\n");
-		state->state = STATE_CONNECTED;
+		PRINTF("KNOT>> CONNECTION FULLY ESTABLISHED<<\n");PRINTFFLUSH();
+		set_state(state, STATE_CONNECTED);
 		return 1;
 	}
 
@@ -256,21 +246,20 @@ implementation {
 	command void KNoT.send_value(ChanState *state, uint8_t *data, uint8_t len){
 	    DataPayload *new_dp = &(state->packet);
 		ResponseMsg *rmsg = (ResponseMsg*)&(new_dp->data);
-		clean_packet(new_dp);
-		//state->ccb.callback(NULL, &data);
-		//rmsg->data = (int)isCooking();
-		//rmsg->data = analogRead(LIGHT);
-		memcpy(&(rmsg->data), data, len);
-	
 		// Send a Response SYN or Response
-		if(state->ticks == 0){
+		if (state->state == STATE_CONNECTED){
+			clean_packet(new_dp);
+			new_dp->hdr.cmd = RESPONSE;
+	    	state->ticks_till_ping--;
+	    } else if(state->state == STATE_RSYN){
+	    	clean_packet(new_dp);
 		    new_dp->hdr.cmd = RSYN; // Send to ensure controller is still out there
-		    state->ticks = RSYN_RATE;
-		    //TODO:Set additional timer to init full PING check
-	    } else{
-	    	new_dp->hdr.cmd = RESPONSE;
-	    	state->ticks--;
+		    state->ticks_till_ping = RSYN_RATE;
+		    set_state(state, STATE_RACK_WAIT);
+	    } else if (state->state == STATE_RACK_WAIT){
+	    	return; /* Waiting for response, no more sensor sends */
 	    }
+	    memcpy(&(rmsg->data), data, len);
 	    new_dp->hdr.src_chan_num = state->chan_num;
 		new_dp->hdr.dst_chan_num = state->remote_chan_num;
 	    new_dp->dhdr.tlen = sizeof(ResponseMsg);
@@ -304,6 +293,15 @@ implementation {
 	             RACK, NO_PAYLOAD);
 		call KNoT.send_on_chan(state, new_dp);
 	}
+	command void KNoT.rack_handler(ChanState *state, DataPayload *dp){
+		if (state->state != STATE_RACK_WAIT){
+			PRINTF("KNOT>> Didn't ask for a RACK!\n");
+			return;
+		}
+		set_state(state, STATE_CONNECTED);
+		set_ticks(state, ticks_till_ping(state->rate));
+		set_attempts(state, ATTEMPTS);
+	}
 
 /*** PING CALLS AND HANDLERS ***/
 	command void KNoT.ping(ChanState *state){
@@ -312,7 +310,7 @@ implementation {
 		dp_complete(new_dp, state->chan_num, state->remote_chan_num, 
 		           PING, NO_PAYLOAD);
 		call KNoT.send_on_chan(state, new_dp);
-		state->state = STATE_PING;
+		set_state(state, STATE_PING);
 	}
 
 	command void KNoT.ping_handler(ChanState *state, DataPayload *dp){
@@ -333,7 +331,7 @@ implementation {
 			PRINTF("KNOT>> Not in PING state\n");
 			return;
 		}
-		state->state = STATE_CONNECTED;
+		set_state(state, STATE_CONNECTED);
 		set_ticks(state, ticks_till_ping(state->rate));
 		set_attempts(state, ATTEMPTS);
 	}
@@ -345,12 +343,12 @@ implementation {
 		dp_complete(new_dp, state->chan_num, state->remote_chan_num, 
 		           DISCONNECT, NO_PAYLOAD);
 		call KNoT.send_on_chan(state,new_dp);
-		state->state = STATE_DCONNECTED;
+		set_state(state, STATE_DCONNECTED);
 	}
-	command void KNoT.disconnect_handler(ChanState *state){
+	command void KNoT.disconnect_handler(ChanState *state, DataPayload *dp){
 		DataPayload *new_dp = &(state->packet);
 		clean_packet(new_dp);
-		dp_complete(new_dp, state->chan_num, state->remote_chan_num, 
+		dp_complete(new_dp, dp->hdr.src_chan_num, state->remote_chan_num, 
 	               DACK, NO_PAYLOAD);
 		call KNoT.send_on_chan(state, new_dp);
 	}

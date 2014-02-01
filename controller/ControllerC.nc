@@ -125,7 +125,7 @@ implementation
 			// case(CMDACK):   	command_ack_handler(state,dp);break;
 			case(PING): call KNoT.ping_handler(state, dp); break;
 			case(PACK): call KNoT.pack_handler(state, dp); break;
-			case(DISCONNECT): call KNoT.disconnect_handler(state); 
+			case(DISCONNECT): call KNoT.disconnect_handler(state, dp); 
 							  call ChannelTable.remove_channel(state->chan_num); break;
 			default: PRINTF("Unknown CMD type\n");
 		}

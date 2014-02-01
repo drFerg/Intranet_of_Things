@@ -28,6 +28,7 @@ interface KNoT{
 	command void response_handler(ChanState *state, DataPayload *dp);
 	
 	command void send_rack(ChanState *state);
+	command void rack_handler(ChanState *state, DataPayload *dp);
 
 	/* Sends a ping packet to the channel in state */
 	command void ping(ChanState *state);
@@ -42,7 +43,7 @@ interface KNoT{
 	command void close_graceful(ChanState *state);
 
 	/* Handles the reception of a DISCONNECT packet */
-	command void disconnect_handler(ChanState *state);
+	command void disconnect_handler(ChanState *state, DataPayload *dp);
 
 	event message_t* receive(uint8_t src, message_t *msg, void *payload, uint8_t len);
 }

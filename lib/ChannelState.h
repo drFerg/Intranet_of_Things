@@ -15,6 +15,8 @@
 #define STATE_DCONNECTED 5
 #define STATE_PING       7
 #define STATE_COMMANDED  9
+#define STATE_RSYN       10
+#define STATE_RACK_WAIT  11
 
 /* Sets the channel state to the specified state */
 #define set_state(chanstate, status) chanstate->state = status
@@ -31,7 +33,7 @@
 #define set_attempts(chanstate, tries) (chanstate->attempts_left = tries)
 #define decrement_ticks(chanstate) (chanstate->ticks_left--)
 #define decrement_attempts(chanstate)(chanstate->attempts_left--)
-                                        
+
 typedef struct channel_state{
    uint8_t remote_addr; //Holds address of remote device
    uint8_t state;

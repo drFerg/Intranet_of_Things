@@ -10,7 +10,7 @@
 * mechanism used in the protocol - these may also be changed using
 * -D<symbol>=value in CFLAGS in the Makefile
 */
-#define TICK_RATE 250 /* tick rate in ms */
+#define TICK_RATE 100 /* tick rate in ms */
 #define ATTEMPTS 5 /* number of attempts before removing channel */
 #define TICKS 5 /* initial number of 20ms ticks before first retry
                  * number of ticks is doubled for each successive retry */
