@@ -1,0 +1,8 @@
+CFLAGS += -I$(TOSDIR)/lib/printf 
+CFLAGS += -DTOSH_DATA_LENGTH=40
+CFLAGS += -DDEBUG -DTELOS 
+CFLAGS += -DDEVICE_NAME=\"TEST\" -I../lib
+#CFLAGS += -DSIM
+COMPONENT=ControllerAppC
+
+include $(MAKERULES)
