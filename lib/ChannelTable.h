@@ -3,7 +3,9 @@
 
 #include "ChannelState.h"
 /* Num of channels available in table */
+#ifndef CHANNEL_NUM
 #define CHANNEL_NUM 5
+#endif /* CHANNEL_NUM */
 
 typedef struct knot_channel{
 	ChanState state;

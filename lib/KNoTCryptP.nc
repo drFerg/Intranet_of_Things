@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include "KNoT.h"
+#include "BlockCipher.h"
 #if DEBUG
 #include "printf.h"
 #define PRINTF(...) printf(__VA_ARGS__)
@@ -41,6 +42,11 @@ implementation {
 	message_t serial_pkt;
 	bool serialSendBusy = FALSE;
 	bool sendBusy = FALSE;
+	CipherModeContext cc[CHANNEL_NUM];
+	uint8_t key[] = {0x05,0x15,0x25,0x35,0x45,0x55,0x65,0x75,0x85,0x95};
+	uint8_t key2[] = {0x01,0x15,0x25,0x35,0x45,0x55,0x65,0x75,0x85,0x95};
+	uint8_t key_size = 10;
+	uint8_t iv[] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 	
 	void increment_seq_no(ChanState *state, DataPayload *dp){
 		if (state->seqno >= SEQNO_LIMIT){
@@ -385,7 +391,8 @@ implementation {
     	PRINTF("*********************\n*** RADIO BOOTED ****\n*********************\n");
     	PRINTF("RADIO>> ADDR: %d\n", call AMPacket.address());
         PRINTFFLUSH();
-        call MiniSec.init();
+        call MiniSec.init(&cc[0], key, key_size, iv, 7);
+        call MiniSec.init(&cc[1], key2, key_size, iv, 7);
     }
 
     event void RadioControl.stopDone(error_t error) {}

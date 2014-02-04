@@ -2,6 +2,18 @@
 #include "ChannelState.h"
 #include <stdlib.h>
 
+#if DEBUG
+#include "printf.h"
+#define PRINTF(...) printf(__VA_ARGS__)
+#define PRINTFFLUSH(...) printfflush()
+#elif SIM
+#define PRINTF(...) dbg("DEBUG",__VA_ARGS__)
+#define PRINTFFLUSH(...)
+#else  
+#define PRINTF(...)
+#define PRINTFFLUSH(...)
+#endif
+
 module ChannelTableC {
 	provides {
 		interface ChannelTable;
@@ -34,6 +46,7 @@ implementation {
 			init_state((&channelTable[i].state), i + 1);
 		}
 		channelTable[CHANNEL_NUM-1].nextChannel = NULL;
+		PRINTF("Num of channels: %d\n", CHANNEL_NUM);PRINTFFLUSH();
 	}
 
 	/*

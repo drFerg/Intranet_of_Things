@@ -34,16 +34,9 @@ implementation
   * don't expect the code to work just by changing the value
   * of BLOCK_SIZE
   */
-  #define BLOCK_SIZE 8  
-  #define PRE_COMP_BLOCKS 7
-  #define TAG_LENGTH 4
 
-  typedef uint8_t block[BLOCK_SIZE];
-  block L[PRE_COMP_BLOCKS + 1];
-  block L_inv;
-  uint8_t num_pre_compute_blocks;
 
-  void xor_block(block dst, block src1, block src2); 
+  void xor_block(Block dst, Block src1, Block src2); 
   void shift_left(uint8_t *x);
   void shift_right(uint8_t *x);
   uint8_t num_trailing_zeros(uint8_t i);
@@ -53,17 +46,13 @@ implementation
                                 uint8_t preComputeBlocks) {
     uint8_t i, first_bit, last_bit;
     uint8_t tmp[] = {0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0};
-    uint8_t tmpd[] = {0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0};
-
-    uint8_t tmpP[] = {0xab, 0x98, 0x15, 0x30, 0x40, 0x91, 0x67, 0x85};
-    uint8_t tmpC[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}; 
 
     call Cipher.init(&(context->cc), BLOCK_SIZE, keySize, key); 
-    call Cipher.encrypt(&(context->cc), tmp, tmp);
 
     /* precompute L[i] values. L[0] is synonym of L */
-    for(i = 0; i <= PRE_COMP_BLOCKS; i++) {
-      memcpy(L[i], tmp, BLOCK_SIZE);//cpy tmp to L[i]
+    call Cipher.encrypt(&(context->cc), tmp, tmp);
+    for(i = 0; i <= PRECOMP_BLOCKS; i++) {
+      memcpy(context->L[i], tmp, BLOCK_SIZE);//cpy tmp to L[i]
       first_bit = tmp[0] & 0x80u;
       shift_left(tmp);
       if(first_bit)
@@ -71,7 +60,7 @@ implementation
     }
 
     /* precompute L_inv = L. x^{-1} */
-    memcpy(tmp, L[0], BLOCK_SIZE);
+    memcpy(tmp, context->L[0], BLOCK_SIZE);
     last_bit = tmp[BLOCK_SIZE - 1] & 0x01;
     shift_right(tmp);
     if(last_bit) {
@@ -79,8 +68,7 @@ implementation
       tmp[BLOCK_SIZE - 1] ^= 0x0D; /* this value depends on the blk size */
     }
 
-    memcpy(L_inv, tmp, BLOCK_SIZE);
-    num_pre_compute_blocks = preComputeBlocks;
+    memcpy(context->L_inv, tmp, BLOCK_SIZE);
     return SUCCESS;
   }
 
@@ -89,19 +77,19 @@ implementation
                                         uint8_t *cipherText, uint8_t *tag, 
                                         uint16_t numBytes, uint8_t *IV) {
     uint8_t i;
-    block tmp, tmp2;
-    block *pt_blk, *ct_blk;
-    block offset;
-    block checksum;
+    Block tmp, tmp2;
+    Block *pt_blk, *ct_blk;
+    Block offset;
+    Block checksum;
     uint16_t pt_len = numBytes;
 
     i = 1;
-    pt_blk = (block *)plainText - 1;
-    ct_blk = (block *)cipherText - 1;
+    pt_blk = (Block *)plainText - 1;
+    ct_blk = (Block *)cipherText - 1;
     memset(checksum, 0, BLOCK_SIZE);
 
     /* calculate R, aka Z[0] */
-    xor_block(offset, IV, L[0]); 
+    xor_block(offset, IV, context->L[0]); 
 
     call Cipher.encrypt(&(context->cc), offset, offset);
     /*
@@ -109,10 +97,10 @@ implementation
     */
     while (pt_len > BLOCK_SIZE) {
       /* Update the Offset (Z[i] from Z[i-1]) */
-      xor_block(offset, L[num_trailing_zeros(i)], offset);
-      /* xor the plaintext block block with Z[i] */
+      xor_block(offset, context->L[num_trailing_zeros(i)], offset);
+      /* xor the plaintext Block Block with Z[i] */
       xor_block(tmp, offset, pt_blk[i]);
-      /* Encipher the block */
+      /* Encipher the Block */
       call Cipher.encrypt(&(context->cc), tmp, tmp);
       /* xor Z[i] again, writing result to ciphertext pointer */
       xor_block(ct_blk[i], offset, tmp);
@@ -122,12 +110,12 @@ implementation
       pt_len -= BLOCK_SIZE;
       i++;
     }
-    /* Process last block (m)*/
+    /* Process last Block (m)*/
     /* Update Offset (Z[m] from Z[m-1]) */
-    xor_block(offset, L[num_trailing_zeros(i)], offset);
+    xor_block(offset, context->L[num_trailing_zeros(i)], offset);
     /* xor L . x^{-1} and Z[m] */
-    xor_block(tmp, offset, L_inv);
-    /* Add in final block bit-length */
+    xor_block(tmp, offset, context->L_inv);
+    /* Add in final Block bit-length */
     tmp[BLOCK_SIZE-1] ^= (pt_len << 3);
     call Cipher.encrypt(&(context->cc), tmp, tmp);
     /* xor 'pt' with block-cipher output, copy valid bytes to 'ct' */
@@ -152,30 +140,30 @@ implementation
                                         uint8_t *IV, uint8_t *valid) {
     uint8_t i;
     uint16_t ct_len = numBytes;
-    block tmp, tmp2;
-    block *ct_blk, *pt_blk;
-    block offset;
-    block checksum;
+    Block tmp, tmp2;
+    Block *ct_blk, *pt_blk;
+    Block offset;
+    Block checksum;
     /* Initializations*/
-    i = 1;                              /* Start with first block              */
-    ct_blk = (block *)cipherBlock - 1;  /* These are adjusted so, for example, */
-    pt_blk = (block *)plainBlock - 1;   /* ct_blk[1] refers to the first block */
+    i = 1;                              /* Start with first Block              */
+    ct_blk = (Block *)cipherBlock - 1;  /* These are adjusted so, for example, */
+    pt_blk = (Block *)plainBlock - 1;   /* ct_blk[1] refers to the first Block */
 
     /* Zero checksum */
     memset(checksum, 0, BLOCK_SIZE);
 
     /* Calculate R, aka Z[0] */
-    xor_block(offset, IV, L[0]);
-    call Cipher.encrypt(&(context -> cc), offset, offset);
+    xor_block(offset, IV, context->L[0]);
+    call Cipher.encrypt(&(context->cc), offset, offset);
 
     
     /* Process blocks 1 .. m-1 */
     while (ct_len > BLOCK_SIZE ) {
       /* Update Offset (Z[i] from Z[i-1]) */
-      xor_block(offset, L[num_trailing_zeros(i)], offset);
-      /* xor ciphertext block with Z[i] */
+      xor_block(offset, context->L[num_trailing_zeros(i)], offset);
+      /* xor ciphertext Block with Z[i] */
       xor_block(tmp, offset, ct_blk[i]);
-      /* Decipher the next block-cipher block */
+      /* Decipher the next block-cipher Block */
       call Cipher.decrypt(&(context->cc), tmp, tmp);
       /* xor Z[i] again, writing result to plaintext ponter */
       xor_block(pt_blk[i], offset, tmp);
@@ -185,12 +173,12 @@ implementation
       ct_len -= BLOCK_SIZE ;
       i++;
     }
-    /* Process last block (m) */
+    /* Process last Block (m) */
     /* Update Offset (Z[m] from Z[m-1]) */
-    xor_block(offset, L[num_trailing_zeros(i)], offset);
+    xor_block(offset, context->L[num_trailing_zeros(i)], offset);
     /* xor L . x^{-1} and Z[m] */
-    xor_block(tmp, offset, L_inv);
-    /* Add in final block bit-length */
+    xor_block(tmp, offset, context->L_inv);
+    /* Add in final Block bit-length */
     tmp[BLOCK_SIZE - 1] ^= (ct_len << 3);
     call Cipher.encrypt(&(context->cc), tmp, tmp);
 
@@ -228,7 +216,7 @@ implementation
   /************************************************************
   * utilities functions                                      *
   ***********************************************************/
-  void  xor_block(block dst, block src1, block src2) {
+  void  xor_block(Block dst, Block src1, Block src2) {
     dst[0] = src1[0] ^ src2[0];
     dst[1] = src1[1] ^ src2[1];
     dst[2] = src1[2] ^ src2[2];

@@ -125,12 +125,9 @@ includes SkipJack;
 
 module SkipJackM {
   provides interface BlockCipher;
-  //provides interface BlockCipherInfo;
 }
 implementation
 {
-    //void dumpBuffer (char * bufName, uint8_t * buf, uint8_t size);
-	  
 	const uint8_t F[256] = 
 	{
 	   0xA3, 0xD7, 0x09, 0x83, 0xF8, 0x48, 0xF6, 0xF4,

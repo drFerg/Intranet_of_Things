@@ -46,7 +46,11 @@
 /**
  * @author Naveen Sastry
  * Slightly modified by: Evan Gaustad 
+ * @author Fergus Leahy 
+ * Added precompilation blocks pointer and removed wasted context space.
  */
+#ifndef CRYPTO_H
+#define CRYPTO_H
 
 typedef struct CipherContext {
   // rc5      needs 104 bytes
@@ -67,7 +71,10 @@ typedef struct MACContext {
  */
 typedef struct CipherModeContext {
   CipherContext cc;
-  uint8_t context[24];
+  //uint8_t context[24];
+  Block L[PRECOMP_BLOCKS + 1];
+  Block L_inv;
 } CipherModeContext;
 
 #define HASH_OUTPUT_SIZE 8
+#endif /* CRYPTO_H */
