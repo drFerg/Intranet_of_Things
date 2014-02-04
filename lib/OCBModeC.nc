@@ -4,6 +4,6 @@ configuration OCBModeC {
 implementation {
     components OCBModeP, SkipJackM;
     OCBMode = OCBModeP;
-    OCBModeP.cipher -> SkipJackM;
+    OCBModeP.Cipher -> SkipJackM;
 
 }

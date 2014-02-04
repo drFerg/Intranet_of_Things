@@ -97,7 +97,7 @@ implementation
   uint8_t preCombBlocks = 5;
   uint8_t tagLength = 4;
   CipherModeContext cc;
-  uint8_t key[];
+  uint8_t key[] = {0x05,0x15,0x25,0x35,0x45,0x55,0x65,0x75,0x85,0x95};
   uint8_t decryptedMsg[]= {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00, 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00, 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00, 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00, 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00, 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00, 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
   uint8_t iv[]= {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 
@@ -289,34 +289,34 @@ implementation
       /* as the tag is also sent, the max length of the msgs is reduced by tag_length */
       state = TRUE;
       if ((length+tag_length+1) > DATA_LENGTH) { /* the 1 is for LB */
- 	dbg(DBG_AM, "AM: Send length too long: %i. Fail.\n", (int)length);
-	state = FALSE;
-	return FAIL;
+        dbg(DBG_AM, "AM: Send length too long: %i. Fail.\n", (int)length);
+        state = FALSE;
+        return FAIL;
       }
       if (!(post sendTask())) {
-	dbg(DBG_AM, "AM: post sendTask failed.\n");
-	state = FALSE;
-	return FAIL;
+      	dbg(DBG_AM, "AM: post sendTask failed.\n");
+      	state = FALSE;
+      	return FAIL;
       }
       else {
-	buffer = data;
-	data->length = length+tag_length+1; /* the 4 is from the tag_length, the 1 is for LB */
-	data->addr = addr;
-	data->type = id;
-	buffer->group = TOS_AM_GROUP;
-	dbg(DBG_AM, "Sending message: %hx, %hhx\n\t", addr, id);
-	dbgPacket(data);
-	/* 
-	 *increment the IV 
-	 * the increment would fail if the complete space for the IV
-	 * was used.
-	 * There is a need to rekey. Otherwise we won't have semantic
-	 * security.
-	 */
-	if(!incIV(iv))
-	  return FAIL;
+      	buffer = data;
+      	data->length = length+tag_length+1; /* the 4 is from the tag_length, the 1 is for LB */
+      	data->addr = addr;
+      	data->type = id;
+      	buffer->group = TOS_AM_GROUP;
+      	dbg(DBG_AM, "Sending message: %hx, %hhx\n\t", addr, id);
+      	dbgPacket(data);
+      	/* 
+      	 *increment the IV 
+      	 * the increment would fail if the complete space for the IV
+      	 * was used.
+      	 * There is a need to rekey. Otherwise we won't have semantic
+      	 * security.
+      	 */
+      	if(!incIV(iv))
+          return FAIL;
       }
-       dbg(DBG_BOOT, "=>gm AM:msg sent\n");
+      dbg(DBG_BOOT, "=>gm AM:msg sent\n");
       return SUCCESS;
     }
     return FAIL;
@@ -510,26 +510,22 @@ implementation
       counter++;
       dbg(DBG_BOOT, "AM_address = %hx, %hhx; counter:%i\n", packet->addr, packet->type, (int)counter);
       
-      if (packet->crc == 1 && // Uncomment this line to check crcs
-	  packet->group == TOS_AM_GROUP &&
-	  (packet->addr == TOS_BCAST_ADDR ||
-	   packet->addr == addr))
-	{
-		
-	  uint8_t type = packet->type;
-	  TOS_MsgPtr tmp;
-	  // Debugging output
-	  dbg(DBG_BOOT, "Received message:\n\t");
-	  dbgPacket(packet);
-	  dbg(DBG_BOOT, "AM_type = %d\n", type);
-	  
-	  // dispatch message
-	  tmp = signal ReceiveMsg.receive[type](packet);
-	  if (tmp) 
-	    packet = tmp;
-	}
-      
-      return packet;
+      if ((packet->crc == 1 && packet->group == TOS_AM_GROUP) &&
+      	  (packet->addr == TOS_BCAST_ADDR || packet->addr == addr)) {
+    	  uint8_t type = packet->type;
+    	  TOS_MsgPtr tmp;
+    	  // Debugging output
+    	  dbg(DBG_BOOT, "Received message:\n\t");
+    	  dbgPacket(packet);
+    	  dbg(DBG_BOOT, "AM_type = %d\n", type);
+    	  
+    	  // dispatch message
+    	  tmp = signal ReceiveMsg.receive[type](packet);
+    	  if (tmp) 
+    	    packet = tmp;
+    	}
+          
+          return packet;
     }
     else {
       dbg(DBG_BOOT, "=>gm AM resync: msg not decrypted \n");
@@ -580,9 +576,9 @@ implementation
 	* deal with that in a separate case.) 
 	* reset the iv to the one before the incrementations.
 	*/
-       for (i=0; i<8; i++) {
-	 iv[i] = iv_current[i];
-       }
+      for (i=0; i<8; i++) {
+        iv[i] = iv_current[i];
+      }
        /*
 	* justing setting the packet data to 0
 	* so that if it doesn't decrypt correctly
@@ -590,8 +586,8 @@ implementation
 	* eventually.
 	*/
        
-       for (i=0; i<enc_msg_length; i++)
-	 packet->data[i] = 0;
+      for (i=0; i<enc_msg_length; i++)
+        packet->data[i] = 0;
        
 
        /*

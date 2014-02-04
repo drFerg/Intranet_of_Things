@@ -8,7 +8,7 @@ implementation {
 	components ActiveMessageC;
 	components LEDBlinkC;
 	components KNoTCryptP;
-    components OCBModeC;
+    components MiniSecC;
 
     components new AMSenderC(AM_KNOT_MESSAGE);
     components new AMReceiverC(AM_KNOT_MESSAGE);
@@ -20,5 +20,5 @@ implementation {
     KNoTCryptP.AMPacket ->AMSenderC;
     KNoTCryptP.Receive -> AMReceiverC;
     KNoTCryptP.LEDBlink -> LEDBlinkC;
-    KNoTCryptP.CipherMode -> OCBModeC;
+    KNoTCryptP.MiniSec -> MiniSecC;
 }
