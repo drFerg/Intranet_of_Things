@@ -82,7 +82,6 @@ implementation {
                                 40, iv, &valid);
         PRINTF("Plaintext block 0: %x\n", decryptedMsg[0]);
         PRINTF("Valid MAC: %s\n", (valid?"yes":"no"));PRINTFFLUSH();
-        PRINTF("Does Fergus win?: %s\n", (valid?"yes":"no"));PRINTFFLUSH();
     }
 	command error_t Sec.init() {    
 		call CipherMode.init(&cc, keySize, key, tagLength, preCombBlocks); 
