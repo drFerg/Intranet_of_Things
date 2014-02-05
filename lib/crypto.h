@@ -54,7 +54,7 @@
 
 typedef struct CipherContext {
   // rc5      needs 104 bytes
-  // skipjack needs 38 bytes because we use a different SkipJack Implmenetation
+  // skipjack needs 38 bytes because we use a different SkipJack Implementation
   uint8_t context[38];
 } CipherContext;
 
@@ -71,9 +71,9 @@ typedef struct MACContext {
  */
 typedef struct CipherModeContext {
   CipherContext cc;
-  //uint8_t context[24];
   Block L[PRECOMP_BLOCKS + 1];
   Block L_inv;
+  Block iv;
 } CipherModeContext;
 
 #define HASH_OUTPUT_SIZE 8

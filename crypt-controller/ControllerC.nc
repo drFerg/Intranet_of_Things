@@ -38,6 +38,8 @@ implementation
 {
 	ChanState home_chan;
 	bool serialSendBusy = FALSE;
+	uint8_t testKey[] = {0x05,0x15,0x25,0x35,0x45,0x55,0x65,0x75,0x85,0x95};
+	uint8_t testKey_size = 10;
 
 		/* Checks the timer for a channel's state, retransmitting when necessary */
 	void check_timer(ChanState *state) {
@@ -45,7 +47,7 @@ implementation
 	    if (ticks_left(state)) return;
 	    if (attempts_left(state)) {
         	if (in_waiting_state(state))
-        		call KNoT.send_on_chan(state, &(state->packet));
+        		call KNoT.send_on_chan(state, &(state->packet.dp));
             else 
             	call KNoT.ping(state); /* PING A LING LONG */
             set_ticks(state, state->ticks * 2); /* Exponential (double) retransmission */
@@ -81,6 +83,7 @@ implementation
         call ChannelTable.init_table();
         call ChannelState.init_state(&home_chan, 0);
         call CleanerTimer.startPeriodic(TICK_RATE);
+        call KNoT.init_symmetric(&home_chan, testKey, testKey_size);
     }
     
  	event void SerialControl.startDone(error_t error) {}

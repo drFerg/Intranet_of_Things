@@ -42,6 +42,7 @@
 #define MAX_DATA_SIZE 32
 #define RESPONSE_DATA_SIZE 16
 #define NAME_SIZE     16
+#define MAC_SIZE      4
 
 const char *cmdnames[17] = {"DUMMY", "QUERY", "QACK","CONNECT", "CACK", 
                                  "RSYN", "RACK", "DISCONNECT", "DACK",
@@ -53,11 +54,10 @@ typedef nx_struct payload_header {
    nx_uint8_t dst_chan_num;
    nx_uint8_t seqno;   /* sequence number */
    nx_uint8_t cmd;	/* message type */
-   nx_uint16_t chksum;
 } PayloadHeader;
 
 typedef nx_struct data_header {
-   nx_uint16_t tlen;	/* total length of the data */
+   nx_uint8_t tlen;	/* total length of the data */
 } DataHeader;
 
 typedef nx_struct data_payload {		/* template for data payload */
@@ -66,6 +66,11 @@ typedef nx_struct data_payload {		/* template for data payload */
    nx_uint8_t data[MAX_DATA_SIZE];	/* data is address of `len' bytes */
 } DataPayload;
 
+typedef nx_struct secure_data_payload {
+   nx_uint8_t flag;
+   nx_uint8_t tag[MAC_SIZE];
+   DataPayload dp;
+} SecureDataPayload;
 /* Message Payloads */
 
 typedef nx_struct query{

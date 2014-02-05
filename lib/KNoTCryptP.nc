@@ -42,12 +42,8 @@ implementation {
 	message_t serial_pkt;
 	bool serialSendBusy = FALSE;
 	bool sendBusy = FALSE;
-	CipherModeContext cc[CHANNEL_NUM];
-	uint8_t key[] = {0x05,0x15,0x25,0x35,0x45,0x55,0x65,0x75,0x85,0x95};
-	uint8_t key2[] = {0x01,0x15,0x25,0x35,0x45,0x55,0x65,0x75,0x85,0x95};
-	uint8_t key_size = 10;
-	uint8_t iv[] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
-	
+	CipherModeContext cc[CHANNEL_NUM + 1];
+
 	void increment_seq_no(ChanState *state, DataPayload *dp){
 		if (state->seqno >= SEQNO_LIMIT){
 			state->seqno = SEQNO_START;
@@ -126,7 +122,7 @@ implementation {
 
 /***** QUERY CALLS AND HANDLERS ******/
 	command void KNoT.query(ChanState* state, uint8_t type){
-		DataPayload *new_dp = &(state->packet); 
+		DataPayload *new_dp = &(state->packet.dp); 
 		QueryMsg *q;
 	    clean_packet(new_dp);
 	    dp_complete(new_dp, HOME_CHANNEL, HOME_CHANNEL, 
@@ -150,7 +146,7 @@ implementation {
 		}
 		PRINTF("Query matches type\n");
 		state->remote_addr = src;
-		new_dp = &(state->packet);
+		new_dp = &(state->packet.dp);
 		qr = (QueryResponseMsg*)&(new_dp->data);
 		clean_packet(new_dp);
 		strcpy((char*)qr->name, DEVICE_NAME); /* copy name */
@@ -180,7 +176,7 @@ implementation {
 		DataPayload *new_dp;
 		state->remote_addr = addr;
 		state->rate = rate;
-		new_dp = &(state->packet);
+		new_dp = &(state->packet.dp);
 		clean_packet(new_dp);
 		dp_complete(new_dp, state->chan_num, HOME_CHANNEL, 
 	             CONNECT, sizeof(ConnectMsg));
@@ -205,7 +201,7 @@ implementation {
 		state->remote_chan_num = dp->hdr.src_chan_num;
 		if (cm->rate > DATA_RATE) state->rate = cm->rate;
 		else state->rate = DATA_RATE;
-		new_dp = &(state->packet);
+		new_dp = &(state->packet.dp);
 		ck = (ConnectACKMsg *)&(new_dp->data);
 		clean_packet(new_dp);
 		dp_complete(new_dp, state->chan_num, state->remote_chan_num, 
@@ -238,7 +234,7 @@ implementation {
 			state->remote_addr,
 			dp->hdr.src_chan_num);PRINTFFLUSH();
 		state->remote_chan_num = dp->hdr.src_chan_num;
-		new_dp = &(state->packet);
+		new_dp = &(state->packet.dp);
 		clean_packet(new_dp);
 		dp_complete(new_dp, state->chan_num, state->remote_chan_num, 
 	             CACK, NO_PAYLOAD);
@@ -268,7 +264,7 @@ implementation {
 
 /**** RESPONSE CALLS AND HANDLERS ***/
 	command void KNoT.send_value(ChanState *state, uint8_t *data, uint8_t len){
-	    DataPayload *new_dp = &(state->packet);
+	    DataPayload *new_dp = &(state->packet.dp);
 		ResponseMsg *rmsg = (ResponseMsg*)&(new_dp->data);
 		// Send a Response SYN or Response
 		if (state->state == STATE_CONNECTED){
@@ -311,7 +307,7 @@ implementation {
 	}
 
 	command void KNoT.send_rack(ChanState *state){
-		DataPayload *new_dp = &(state->packet);
+		DataPayload *new_dp = &(state->packet.dp);
 		clean_packet(new_dp);
 		dp_complete(new_dp, state->chan_num, state->remote_chan_num, 
 	             RACK, NO_PAYLOAD);
@@ -329,7 +325,7 @@ implementation {
 
 /*** PING CALLS AND HANDLERS ***/
 	command void KNoT.ping(ChanState *state){
-		DataPayload *new_dp = &(state->packet);
+		DataPayload *new_dp = &(state->packet.dp);
 		clean_packet(new_dp);
 		dp_complete(new_dp, state->chan_num, state->remote_chan_num, 
 		           PING, NO_PAYLOAD);
@@ -343,7 +339,7 @@ implementation {
 			PRINTF("KNOT>> Not in Connected state\n");
 			return;
 		}
-		new_dp = &(state->packet);
+		new_dp = &(state->packet.dp);
 		clean_packet(new_dp);
 		dp_complete(new_dp, state->chan_num, state->remote_chan_num, 
 		           PACK, NO_PAYLOAD);
@@ -362,7 +358,7 @@ implementation {
 
 /*** DISCONNECT CALLS AND HANDLERS ***/
 	command void KNoT.close_graceful(ChanState *state){
-		DataPayload *new_dp = &(state->packet);
+		DataPayload *new_dp = &(state->packet.dp);
 		clean_packet(new_dp);
 		dp_complete(new_dp, state->chan_num, state->remote_chan_num, 
 		           DISCONNECT, NO_PAYLOAD);
@@ -370,13 +366,17 @@ implementation {
 		set_state(state, STATE_DCONNECTED);
 	}
 	command void KNoT.disconnect_handler(ChanState *state, DataPayload *dp){
-		DataPayload *new_dp = &(state->packet);
+		DataPayload *new_dp = &(state->packet.dp);
 		clean_packet(new_dp);
 		dp_complete(new_dp, dp->hdr.src_chan_num, state->remote_chan_num, 
 	               DACK, NO_PAYLOAD);
 		call KNoT.send_on_chan(state, new_dp);
 	}
 
+	command void KNoT.init_symmetric(ChanState *state, uint8_t *key, uint8_t key_size){
+		call MiniSec.init(&cc[state->chan_num], key, key_size, 7);
+
+	}
 
 /*--------------------------- EVENTS ------------------------------------------------*/
    event void Boot.booted() {
@@ -390,9 +390,8 @@ implementation {
     event void RadioControl.startDone(error_t error) {
     	PRINTF("*********************\n*** RADIO BOOTED ****\n*********************\n");
     	PRINTF("RADIO>> ADDR: %d\n", call AMPacket.address());
-        PRINTFFLUSH();
-        call MiniSec.init(&cc[0], key, key_size, iv, 7);
-        call MiniSec.init(&cc[1], key2, key_size, iv, 7);
+      PRINTFFLUSH();
+      //call MiniSec.init(&cc[0], testkey, testkey_size, iv, 7);
     }
 
     event void RadioControl.stopDone(error_t error) {}
