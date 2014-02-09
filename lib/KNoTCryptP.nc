@@ -73,16 +73,15 @@ implementation {
 		PRINTFFLUSH();
 	}
 
-	void send_encrypted(int dest, DataPayload *dp){
-		uint8_t len = sizeof(PayloadHeader) + sizeof(DataHeader) + dp->dhdr.tlen;
-		DataPayload *payload = (DataPayload *) (call AMSend.getPayload(&am_pkt, sizeof(DataPayload)));
-		
-		memcpy(payload, dp, sizeof(DataPayload));
+	void send_encrypted(int dest, SecDataPayload *dp, uint8_t len){
+		//uint8_t len = sizeof(PayloadHeader) + sizeof(DataHeader) + dp->dhdr.tlen;
+		SecDataPayload *payload = (SecDataPayload *) (call AMSend.getPayload(&am_pkt, len));
+		memcpy(payload, dp, len);
 		//call AMPacket.setSource(&am_pkt, call AMPacket.address());
 		if (call AMSend.send(dest, &am_pkt, len) == SUCCESS) {
 			sendBusy = TRUE;
 			PRINTF("RADIO>> Sent a %s packet to Thing %d\n", cmdnames[dp->hdr.cmd], dest);		
-			PRINTF("RADIO>> KNoT Payload Length: %d\n", dp->dhdr.tlen);
+			//PRINTF("RADIO>> KNoT Payload Length: %d\n", len);
 		}
 		else {
 			PRINTF("ID: %d, Radio Msg could not be sent, channel busy\n", TOS_NODE_ID);
@@ -118,7 +117,7 @@ implementation {
 
 	command void KNoT.knot_broadcast(ChanState *state, DataPayload *dp){
 		increment_seq_no(state, dp);
-		send(AM_BROADCAST_ADDR, dp);
+		send_encrypted(AM_BROADCAST_ADDR, dp);
 	}
 
 
@@ -393,6 +392,7 @@ implementation {
         PRINTFFLUSH();
         call MiniSec.init(&cc[0], key, key_size, iv, 7);
         call MiniSec.init(&cc[1], key2, key_size, iv, 7);
+
     }
 
     event void RadioControl.stopDone(error_t error) {}

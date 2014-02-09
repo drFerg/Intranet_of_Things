@@ -84,6 +84,7 @@ implementation {
 	command error_t Sec.init(CipherModeContext *cc, uint8_t *key, uint8_t key_size, uint8_t *iv,
                             uint8_t num_precomp_blks) {    
 		call CipherMode.init(cc, key_size, key, tag_length, num_precomp_blks); 
+        memset(cc->iv, 0, BLOCK_SIZE);
 		lastCount = 0;
 		counter = 0;
 		nbreLB = 1;
@@ -92,20 +93,19 @@ implementation {
 		num_fails = 0;
 		num_fb_resync= 4;
 		waiting_for_resync=0;
-        test(cc, iv);
+        test(cc, cc->iv);
 		return SUCCESS;
 	}
 
 	command error_t Sec.encrypt(CipherModeContext *cc, uint8_t *data, uint8_t length, uint8_t *taggy, 
-								 uint8_t tag_len, uint8_t *iv) {
+								 uint8_t tag_len) {
 	    uint8_t len_to_send;
-		PRINTF("IV = %d", iv+7);
-		call CipherMode.encrypt(cc, data, cipherMsg, taggy, length, iv);
+		PRINTF("IV = %d", cc->iv + 7);
+		call CipherMode.encrypt(cc, data, cipherMsg, taggy, length, cc->iv);
 		memcpy(data, cipherMsg, length);
-		//memcpy(data + length, taggy, tag_len);
-		*iv = iv[7] & (0xff >> (8-nbreLB));
+		PRINTF("WTF: %d\n", cc->iv[7] & (0xff >> (8-nbreLB)));PRINTFFLUSH();
 	  	len_to_send = length + tag_len + 1;
-	  	if(!incrementIV(iv))
+	  	if(!incrementIV(cc->iv))
 	  		return FAIL;
 	   	else 
 	   	    return len_to_send;
@@ -113,14 +113,11 @@ implementation {
 
     command error_t Sec.decrypt(CipherModeContext *cc, uint8_t *cipher_blocks,
                                 uint8_t *plain_blocks, uint8_t cipher_len, 
-                                uint8_t *taggy, uint8_t *iv, uint8_t *valid) {
+                                uint8_t *taggy, uint8_t *valid) {
 
         call CipherMode.decrypt(cc, cipher_blocks, taggy, plain_blocks, 
-                                cipher_len, iv, valid);
+                                cipher_len, cc->iv, valid);
     }
-
-
-
 
 
     error_t incrementIV(uint8_t *iv_block) {

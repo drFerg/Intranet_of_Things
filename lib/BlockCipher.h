@@ -14,5 +14,6 @@
 #endif /* TAG_LENGTH */
 
 typedef uint8_t Block[BLOCK_SIZE];
+typedef uint8_t Tag[TAG_LENGTH];
 
 #endif /* BLOCK_CIPHER */

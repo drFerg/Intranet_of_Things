@@ -74,6 +74,7 @@ typedef struct CipherModeContext {
   //uint8_t context[24];
   Block L[PRECOMP_BLOCKS + 1];
   Block L_inv;
+  Block iv;
 } CipherModeContext;
 
 #define HASH_OUTPUT_SIZE 8

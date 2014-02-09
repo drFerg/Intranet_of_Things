@@ -66,6 +66,13 @@ typedef nx_struct data_payload {		/* template for data payload */
    nx_uint8_t data[MAX_DATA_SIZE];	/* data is address of `len' bytes */
 } DataPayload;
 
+typedef nx_struct sec_data_payload {    /* template for data payload */
+   PayloadHeader hdr;
+   DataHeader dhdr;
+   nx_uint8_t tag[4];
+   nx_uint8_t data[MAX_DATA_SIZE];  /* data is address of `len' bytes */
+} SecDataPayload;
+
 /* Message Payloads */
 
 typedef nx_struct query{
