@@ -45,5 +45,7 @@ interface KNoTCrypt{
 	/* Handles the reception of a DISCONNECT packet */
 	command void disconnect_handler(ChanState *state, DataPayload *dp);
 
+	command void init_symmetric(ChanState *state, uint8_t *key, uint8_t key_size);
+	
 	event message_t* receive(uint8_t src, message_t *msg, void *payload, uint8_t len);
 }

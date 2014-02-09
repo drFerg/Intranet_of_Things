@@ -94,9 +94,8 @@ interface OCBMode
   async command error_t encrypt(CipherModeContext * context,
 				 uint8_t * plainText, 
 				 uint8_t * cipherText,
-				 uint8_t * tag,
-				 uint16_t numBytes, 
-				 uint8_t * IV);
+             uint16_t pt_len,
+				 uint8_t * tag);
 
   /**
    * Decrypts numBytes of plainText data using the key from the init phase.
@@ -119,13 +118,9 @@ interface OCBMode
    *        include not calling init() or an incorrectly sized cipher-text
    *        array.
    */
-  async command error_t decrypt(CipherModeContext * context,
-				 uint8_t * cipherBlock,
-				 uint8_t * tag,
-				 uint8_t * plainBlock,
-				 uint16_t numBytes, 
-				 uint8_t * IV,
-				 uint8_t * valid);
+  async command error_t decrypt(CipherModeContext *context, uint8_t *cipherBlock,
+                                        uint8_t *plainBlock, uint16_t ct_len, uint8_t *tag,
+                                        uint8_t *valid);
 
   /**
    * Initializes the mode for an incremental decryption operation. This step

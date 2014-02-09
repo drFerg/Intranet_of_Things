@@ -74,14 +74,12 @@ implementation
 
 
   async command error_t OCBMode.encrypt(CipherModeContext *context, uint8_t *plainText, 
-                                        uint8_t *cipherText, uint8_t *tag, 
-                                        uint16_t numBytes, uint8_t *IV) {
+                                        uint8_t *cipherText, uint16_t pt_len, uint8_t *tag) {
     uint8_t i;
     Block tmp, tmp2;
     Block *pt_blk, *ct_blk;
     Block offset;
     Block checksum;
-    uint16_t pt_len = numBytes;
 
     i = 1;
     pt_blk = (Block *)plainText - 1;
@@ -89,7 +87,7 @@ implementation
     memset(checksum, 0, BLOCK_SIZE);
 
     /* calculate R, aka Z[0] */
-    xor_block(offset, IV, context->L[0]); 
+    xor_block(offset, context->iv, context->L[0]); 
 
     call Cipher.encrypt(&(context->cc), offset, offset);
     /*
@@ -136,10 +134,9 @@ implementation
   }
 
   async command error_t OCBMode.decrypt(CipherModeContext *context, uint8_t *cipherBlock,
-                                        uint8_t *tag, uint8_t *plainBlock, uint16_t numBytes, 
-                                        uint8_t *IV, uint8_t *valid) {
+                                        uint8_t *plainBlock, uint16_t ct_len, uint8_t *tag,
+                                        uint8_t *valid) {
     uint8_t i;
-    uint16_t ct_len = numBytes;
     Block tmp, tmp2;
     Block *ct_blk, *pt_blk;
     Block offset;
@@ -153,7 +150,7 @@ implementation
     memset(checksum, 0, BLOCK_SIZE);
 
     /* Calculate R, aka Z[0] */
-    xor_block(offset, IV, context->L[0]);
+    xor_block(offset, context->iv, context->L[0]);
     call Cipher.encrypt(&(context->cc), offset, offset);
 
     
@@ -193,7 +190,7 @@ implementation
 
     /* Calculate tag */
     xor_block(checksum, checksum, offset);
-    call Cipher.encrypt(&(context -> cc),checksum, tmp); 
+    call Cipher.encrypt(&(context->cc),checksum, tmp); 
     *valid = (memcmp(tag, tmp, TAG_LENGTH) == 0 ? 1 : 0);
     return SUCCESS;
   }
