@@ -67,14 +67,14 @@ typedef nx_struct data_payload {		/* template for data payload */
 } DataPayload;
 
 typedef nx_struct sec_header {
-   nx_uint8_t flag;
+   nx_uint8_t flags;
    nx_uint8_t tag[MAC_SIZE];
 } SecHeader;
 
 typedef nx_struct secure_data_payload {
    SecHeader sh;
    DataPayload dp;
-} SecureDataPayload;
+} SecDataPayload;
 
 /* Message Payloads */
 

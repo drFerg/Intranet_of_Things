@@ -25,6 +25,8 @@
 #define DATA_RATE 10
 #endif
 
+
+
 module KNoTCryptP @safe() {
 	provides interface KNoTCrypt as KNoT;
 	uses {
@@ -69,14 +71,21 @@ implementation {
 		PRINTFFLUSH();
 	}
 
-	void send_encrypted(int dest, SecDataPayload *dp, uint8_t len){
-		//uint8_t len = sizeof(PayloadHeader) + sizeof(DataHeader) + dp->dhdr.tlen;
-		SecDataPayload *payload = (SecDataPayload *) (call AMSend.getPayload(&am_pkt, len));
-		memcpy(payload, dp, len);
-		//call AMPacket.setSource(&am_pkt, call AMPacket.address());
+	void send_encrypted(int dest, uint8_t chan, SecDataPayload *sp){
+		SecDataPayload *payload;
+		uint8_t len = sizeof(PayloadHeader) + sizeof(DataHeader) + sp->dp.dhdr.tlen;
+		
+		len = call MiniSec.encrypt(&cc[chan], (uint8_t*)sp, len, (uint8_t*)&(sp->sh.tag));
+		sp->sh.flags = 0;
+		sp->sh.flags |= SYMMETRIC_MASK; /* Set symmetric flag */
+		sp->sh.flags |= (cc[chan].iv[7] & (0xff >> 2)); /* OR lower 6 bits of IV */
+		PRINTF("SEC>> Flags: %d\n", sp->sh.flags);
+		PRINTF("SEC>> IV: %d\n", (sp->sh.flags & (0xff >> 2)));
+		payload = (SecDataPayload *) (call AMSend.getPayload(&am_pkt, len));
+		memcpy(payload, sp, len);
 		if (call AMSend.send(dest, &am_pkt, len) == SUCCESS) {
 			sendBusy = TRUE;
-			PRINTF("RADIO>> Sent a %s packet to Thing %d\n", cmdnames[dp->hdr.cmd], dest);		
+			PRINTF("RADIO>> Sent a packet to Thing %d\n", dest);		
 			//PRINTF("RADIO>> KNoT Payload Length: %d\n", len);
 		}
 		else {
@@ -113,7 +122,7 @@ implementation {
 
 	command void KNoT.knot_broadcast(ChanState *state, DataPayload *dp){
 		increment_seq_no(state, dp);
-		send_encrypted(AM_BROADCAST_ADDR, dp);
+		send_encrypted(AM_BROADCAST_ADDR, state->chan_num, &(state->packet));
 	}
 
 
@@ -390,8 +399,6 @@ implementation {
     	PRINTF("*********************\n*** RADIO BOOTED ****\n*********************\n");
     	PRINTF("RADIO>> ADDR: %d\n", call AMPacket.address());
         PRINTFFLUSH();
-        call MiniSec.init(&cc[0], key, key_size, iv, 7);
-        call MiniSec.init(&cc[1], key2, key_size, iv, 7);
     }
 
     event void RadioControl.stopDone(error_t error) {}

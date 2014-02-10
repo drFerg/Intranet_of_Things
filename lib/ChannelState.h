@@ -45,7 +45,7 @@ typedef struct channel_state{
    uint8_t ticks_left;
    uint8_t ticks_till_ping;
    uint8_t attempts_left;
-   SecureDataPayload packet;
+   SecDataPayload packet;
 }ChanState;
 
 

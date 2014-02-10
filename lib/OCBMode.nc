@@ -94,7 +94,7 @@ interface OCBMode
   async command error_t encrypt(CipherModeContext * context,
 				 uint8_t * plainText, 
 				 uint8_t * cipherText,
-             uint16_t pt_len,
+         uint16_t pt_len,
 				 uint8_t * tag);
 
   /**

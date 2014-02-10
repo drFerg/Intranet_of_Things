@@ -18,6 +18,14 @@
                                /* 3 packets have not been received. */
 #define RSYN_RATE 15 /* Rate to send out a RSYN message */ 
 /* Memsets a Datapayload */
-#define clean_packet(dp) (memset(dp, '\0', sizeof(DataPayload)))
+#define clean_packet(dp) (memset(dp, 0, sizeof(DataPayload)))
+
+
+#define PLAIN_TEXT_MASK (0 << 7)
+#define ASYMMETRIC_MASK (1 << 7)
+#define SYMMETRIC_MASK  (1 << 6)
+#define is_plaintext(flag) (flag & PLAIN_TEXT_MASK)
+#define is_asymmetric(flag) (flag & ASYMMETRIC_MASK)
+#define is_symmetric(flag) (flag & SYMMETRIC_MASK)
 
 #endif /* KNOT_H */
