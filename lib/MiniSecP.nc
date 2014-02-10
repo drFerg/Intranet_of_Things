@@ -13,8 +13,8 @@
 #ifndef TAG_LEN
 #define TAG_LEN 4
 #endif /* TAG_LEN */
-
-#define LB_N_MASK(N) (0xff >> (8 - N))
+/* Lower N Bits */
+#define LNB_MASK(N) (0xff >> (8 - N))
 #define IV_BITS 6
 
 module MiniSecP @safe() {
@@ -107,29 +107,37 @@ implementation {
                                 uint8_t *tag) {
     uint8_t len_to_send;
     uint16_t len = length;
+    PRINTF("len: %d", len);
+    PRINTF("IV = %d\n", cc->iv[7]);
+    if(incrementIV(cc->iv)) {PRINTF("OH NOES\n");return FAIL;}
     PRINTF("IV = %d\n", cc->iv[7]);
     call CipherMode.encrypt(cc, data, cipherMsg, length, tag);
     memcpy(data, cipherMsg, length);
     len_to_send = length + TAG_LEN + 1;
-    if(!incrementIV(cc->iv)) return FAIL;
-    else return len_to_send;
+    PRINTF("len_to_send: %d\n", len_to_send);
+    return len_to_send;
   }
 
   command error_t Sec.decrypt(CipherModeContext *cc, uint8_t iv, uint8_t *cipher_blocks, uint8_t length, 
-                            uint8_t *plain_blocks, uint8_t *tag, uint8_t *valid) {
-    while (cc->iv[7] & LB_N_MASK(IV_BITS) < iv & LB_N_MASK(IV_BITS)){
+                              uint8_t *plain_blocks, uint8_t *tag, uint8_t *valid) {
+    uint8_t attempts_left = 64;
+    while (attempts_left-- && ((cc->iv[7] & LNB_MASK(IV_BITS)) != (iv & LNB_MASK(IV_BITS)))){
       incrementIV(cc->iv);
+      PRINTF("+1\n");
     }
+    if (attempts_left == 0) return FAIL;
+    PRINTF("IV = %d\n", cc->iv[7]);
     call CipherMode.decrypt(cc, cipher_blocks, plain_blocks,
                               length, tag, valid);
+    return *valid;
   }
 
 
   error_t incrementIV(uint8_t *iv_block) {
     uint8_t i;
     for (i = 7; i >= 0; i--) {
-        iv_block[i]++;
-        if (iv_block[i]) return SUCCESS;
+      iv_block[i]++;
+      if (iv_block[i]) return SUCCESS;
     }
     return FAIL;
   }

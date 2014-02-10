@@ -31,12 +31,12 @@ module KNoTCryptP @safe() {
 	provides interface KNoTCrypt as KNoT;
 	uses {
 		interface Boot;
-	    interface AMPacket;
-        interface Receive;
-        interface AMSend;
-        interface SplitControl as RadioControl;
-        interface LEDBlink;
-        interface MiniSec;
+    interface AMPacket;
+    interface Receive;
+    interface AMSend;
+    interface SplitControl as RadioControl;
+    interface LEDBlink;
+    interface MiniSec;
 	}
 }
 implementation {
@@ -75,12 +75,15 @@ implementation {
 		SecDataPayload *payload;
 		uint8_t len = sizeof(PayloadHeader) + sizeof(DataHeader) + sp->dp.dhdr.tlen;
 		
-		len = call MiniSec.encrypt(&cc[chan], (uint8_t*)sp, len, (uint8_t*)&(sp->sh.tag));
+		len = call MiniSec.encrypt(&cc[chan], (uint8_t*)(&sp->dp), len, (uint8_t*)&(sp->sh.tag));
+    //call MiniSec.decrypt(&cc[chan], cc[chan].iv[7], (uint8_t*)sp, len, (uint8_t*)&(sp->sh.tag))
+    PRINTF("lentosend: %d\n", len);
 		sp->sh.flags = 0;
 		sp->sh.flags |= SYMMETRIC_MASK; /* Set symmetric flag */
 		sp->sh.flags |= (cc[chan].iv[7] & (0xff >> 2)); /* OR lower 6 bits of IV */
 		PRINTF("SEC>> Flags: %d\n", sp->sh.flags);
 		PRINTF("SEC>> IV: %d\n", (sp->sh.flags & (0xff >> 2)));
+    PRINTF("SEC>> Size of encrypted payload: %d\n", len - 5);
 		payload = (SecDataPayload *) (call AMSend.getPayload(&am_pkt, len));
 		memcpy(payload, sp, len);
 		if (call AMSend.send(dest, &am_pkt, len) == SUCCESS) {
@@ -125,6 +128,13 @@ implementation {
 		send_encrypted(AM_BROADCAST_ADDR, state->chan_num, &(state->packet));
 	}
 
+  command void KNoT.receiveDecrypt(ChanState *state, SecDataPayload *sp, uint8_t len){
+    uint8_t valid;
+    PRINTF("Size of encrypted payload: %d\n", len - 5);
+    call MiniSec.decrypt(&cc[state->chan_num], sp->sh.flags, (uint8_t *)&(sp->dp), len - 5,
+     (uint8_t *)&(sp->dp), (uint8_t *)&(sp->sh.tag), &valid);
+    PRINTF("Valid MAC: %s\n", (valid?"yes":"no"));PRINTFFLUSH();
+  }
 
 /* Higher level calls */
 

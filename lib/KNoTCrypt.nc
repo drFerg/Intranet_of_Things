@@ -46,6 +46,7 @@ interface KNoTCrypt{
 	command void disconnect_handler(ChanState *state, DataPayload *dp);
 
 	command void init_symmetric(ChanState *state, uint8_t *key, uint8_t key_size);
+    command void receiveDecrypt(ChanState *state, SecDataPayload *sp, uint8_t len);
 	
 	event message_t* receive(uint8_t src, message_t *msg, void *payload, uint8_t len);
 }

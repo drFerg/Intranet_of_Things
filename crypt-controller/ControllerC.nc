@@ -92,12 +92,15 @@ implementation
 /*-----------Received packet event, main state event ------------------------------- */
     event message_t* KNoT.receive(uint8_t src, message_t* msg, void* payload, uint8_t len) {
     	ChanState *state;
+    	uint8_t cmd;
         SecDataPayload *sp = (SecDataPayload *) payload;
         DataPayload *dp = &(sp->dp);
 		/* Gets data from the connection */
-		uint8_t cmd = dp->hdr.cmd;
+		
 		PRINTF("SEC>> Received %s packet\n", is_symmetric(sp->sh.flags)?"Symmetric":"Plain");
-		PRINTF("SEC>> IV: %d\n", sp->sh.flags & (0xff >> 2));
+		PRINTF("SEC>> IV: %d\n", sp->sh.flags & (0xff >> 2));PRINTFFLUSH();
+		call KNoT.receiveDecrypt(&home_chan, sp, len);
+		cmd = dp->hdr.cmd;
 		PRINTF("CON>> Received packet from Thing: %d\n", src);
 		PRINTF("CON>> Received a %s command\n", cmdnames[cmd]);
 		PRINTF("CON>> Message for channel %d\n", dp->hdr.dst_chan_num);
