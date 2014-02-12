@@ -77,12 +77,12 @@ implementation
 	
 	event void Boot.booted() {
 		PRINTF("\n*********************\n****** BOOTED *******\n*********************\n");
-        PRINTFFLUSH();
-        call LEDBlink.report_problem();
-        call ChannelTable.init_table();
-        call ChannelState.init_state(&home_chan, 0);
-        call CleanerTimer.startPeriodic(TICK_RATE);
-        call KNoT.init_symmetric(&home_chan, testKey, testKey_size);
+    PRINTFFLUSH();
+    call LEDBlink.report_problem();
+    call ChannelTable.init_table();
+    call ChannelState.init_state(&home_chan, 0);
+    call CleanerTimer.startPeriodic(TICK_RATE);
+    call KNoT.init_symmetric(&home_chan, testKey, testKey_size);
     }
     
  	event void SerialControl.startDone(error_t error) {}
@@ -91,7 +91,7 @@ implementation
    
 /*-----------Received packet event, main state event ------------------------------- */
     event message_t* KNoT.receive(uint8_t src, message_t* msg, void* payload, uint8_t len) {
-      uint8_t valid;
+      uint8_t valid = 0;
     	ChanState *state;
     	uint8_t cmd;
     	Packet *p = (Packet *) payload;
@@ -99,9 +99,8 @@ implementation
       PDataPayload *pdp = NULL;
       ChanHeader *ch = NULL;
 		/* Gets data from the connection */
-		  PRINTF("SEC>> Received %s packet\n", 
-      			is_symmetric(p->flags)?"Symmetric":
-      			is_asymmetric(p->flags)?"Asymmetric":"Plain");
+		  PRINTF("SEC>> Received %s packet\n", is_symmetric(p->flags)?"Symmetric":
+      			                               is_asymmetric(p->flags)?"Asymmetric":"Plain");
 
 		if (is_symmetric(p->flags)) {
       PRINTF("SEC>> IV: %d\n", sp->flags & (0xff >> 2));PRINTFFLUSH();
@@ -125,7 +124,7 @@ implementation
 			pdp = (PDataPayload *) (&sp->ch); /* Offsetting to start of pdp */
 		} else if (is_asymmetric(p->flags)) { 
 			return msg;
-		} else pdp = (PDataPayload *) p->data;
+		} else pdp = (PDataPayload *) &(p->ch);
 
     ch = &(pdp->ch);
 		cmd = pdp->dp.hdr.cmd;

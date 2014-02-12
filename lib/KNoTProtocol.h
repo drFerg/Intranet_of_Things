@@ -88,7 +88,8 @@ typedef nx_struct plain_data_payload {
 
 typedef nx_struct packet {
    nx_uint8_t flags;
-   nx_uint8_t data[MAX_PACKET_SIZE];
+   ChanHeader ch;
+   DataPayload dp;
 } Packet;
 /* Message Payloads */
 

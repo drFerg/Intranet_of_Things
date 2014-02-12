@@ -79,13 +79,14 @@ implementation {
 	}
 	
 	void send(int dest, PDataPayload *pdp){
-		uint8_t len = sizeof(ChanHeader) + sizeof(PayloadHeader) + sizeof(DataHeader) + pdp->dp.dhdr.tlen;
-		PDataPayload *payload = (PDataPayload *) (call AMSend.getPayload(&am_pkt, len));
-		memcpy(payload, pdp, len);
+		uint8_t len = FLAG_SIZE + sizeof(ChanHeader) + sizeof(PayloadHeader) + sizeof(DataHeader) + pdp->dp.dhdr.tlen;
+		Packet *payload = (Packet *) (call AMSend.getPayload(&am_pkt, len));
+    payload->flags = 0;
+		memcpy(&(payload->ch), pdp, len);
 		if (call AMSend.send(dest, &am_pkt, len) == SUCCESS) {
 			sendBusy = TRUE;
-			PRINTF("RADIO>> Sent a %s packet to Thing %d\n", cmdnames[pdp->dp.hdr.cmd], dest);		
-			PRINTF("RADIO>> KNoT Payload Length: %d\n", pdp->dp.dhdr.tlen);
+			PRINTF("RADIO>> Sent a %s packet to Thing %d\n", cmdnames[payload->dp.hdr.cmd], dest);		
+			PRINTF("RADIO>> KNoT Payload Length: %d\n", payload->dp.dhdr.tlen);
 		}
 		else {
 			PRINTF("ID: %d, Radio Msg could not be sent, channel busy\n", TOS_NODE_ID);
