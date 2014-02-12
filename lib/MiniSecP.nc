@@ -103,24 +103,21 @@ implementation {
     return SUCCESS;
   }
 
-  command error_t Sec.encrypt(CipherModeContext *cc, uint8_t *data, uint8_t length, 
-                                uint8_t *tag) {
-    uint8_t len_to_send;
-    uint16_t len = length;
-    PRINTF("len: %d", len);
+  command error_t Sec.encrypt(CipherModeContext *cc, uint8_t *plain_blocks, uint8_t length, 
+                              uint8_t *cipher_blocks, uint8_t *tag) {
+    PRINTF("len: %d\n", length);
     PRINTF("IV = %d\n", cc->iv[7]);
     if(incrementIV(cc->iv)) {PRINTF("OH NOES\n");return FAIL;}
     PRINTF("IV = %d\n", cc->iv[7]);
-    call CipherMode.encrypt(cc, data, cipherMsg, length, tag);
-    memcpy(data, cipherMsg, length);
-    len_to_send = length + TAG_LEN + 1;
-    PRINTF("len_to_send: %d\n", len_to_send);
-    return len_to_send;
+    call CipherMode.encrypt(cc, plain_blocks, cipher_blocks, length, tag);
+    //memcpy(data, cipherMsg, length);
+    PRINTF("cipher_tag_len: %d\n", length + TAG_LEN);
+    return length + TAG_LEN;
   }
 
   command error_t Sec.decrypt(CipherModeContext *cc, uint8_t iv, uint8_t *cipher_blocks, uint8_t length, 
                               uint8_t *plain_blocks, uint8_t *tag, uint8_t *valid) {
-    uint8_t attempts_left = 64;
+    uint8_t attempts_left = 63;
     while (attempts_left-- && ((cc->iv[7] & LNB_MASK(IV_BITS)) != (iv & LNB_MASK(IV_BITS)))){
       incrementIV(cc->iv);
       PRINTF("+1\n");

@@ -46,7 +46,7 @@ implementation
 	    if (ticks_left(state)) return;
 	    if (attempts_left(state)) {
         	if (in_waiting_state(state))
-        		call KNoT.send_on_chan(state, &(state->packet.dp));
+        		call KNoT.send_on_chan(state, &(state->packet));
             else 
             	call KNoT.ping(state); /* PING A LING LONG */
             set_ticks(state, state->ticks * 2); /* Exponential (double) retransmission */
@@ -91,50 +91,78 @@ implementation
    
 /*-----------Received packet event, main state event ------------------------------- */
     event message_t* KNoT.receive(uint8_t src, message_t* msg, void* payload, uint8_t len) {
+      uint8_t valid;
     	ChanState *state;
     	uint8_t cmd;
-        SecDataPayload *sp = (SecDataPayload *) payload;
-        DataPayload *dp = &(sp->dp);
+    	Packet *p = (Packet *) payload;
+      SSecPacket *sp = NULL;
+      PDataPayload *pdp = NULL;
+      ChanHeader *ch = NULL;
 		/* Gets data from the connection */
-		
-		PRINTF("SEC>> Received %s packet\n", is_symmetric(sp->sh.flags)?"Symmetric":"Plain");
-		PRINTF("SEC>> IV: %d\n", sp->sh.flags & (0xff >> 2));PRINTFFLUSH();
-		call KNoT.receiveDecrypt(&home_chan, sp, len);
-		cmd = dp->hdr.cmd;
+		  PRINTF("SEC>> Received %s packet\n", 
+      			is_symmetric(p->flags)?"Symmetric":
+      			is_asymmetric(p->flags)?"Asymmetric":"Plain");
+
+		if (is_symmetric(p->flags)) {
+      PRINTF("SEC>> IV: %d\n", sp->flags & (0xff >> 2));PRINTFFLUSH();
+			sp = (SSecPacket *) p;
+      if (sp->ch.dst_chan_num) { /* Get CC for channel */ 
+        state = call ChannelTable.get_channel_state(sp->ch.dst_chan_num);
+        if (!state){ /* If bogus request kill bogie */
+          PRINTF("Channel %d doesn't exist\n", ch->dst_chan_num);
+          state = &home_chan;
+          state->remote_chan_num = ch->src_chan_num;
+          state->remote_addr = src;
+          state->seqno = pdp->dp.hdr.seqno;
+          call KNoT.close_graceful(state);
+          return msg;
+        }
+      } else state = &home_chan;
+
+			call KNoT.receiveDecrypt(state, sp, len, &valid);
+      if (!valid) return msg; /* Return if decryption failed */
+
+			pdp = (PDataPayload *) (&sp->ch); /* Offsetting to start of pdp */
+		} else if (is_asymmetric(p->flags)) { 
+			return msg;
+		} else pdp = (PDataPayload *) p->data;
+
+    ch = &(pdp->ch);
+		cmd = pdp->dp.hdr.cmd;
 		PRINTF("CON>> Received packet from Thing: %d\n", src);
 		PRINTF("CON>> Received a %s command\n", cmdnames[cmd]);
-		PRINTF("CON>> Message for channel %d\n", dp->hdr.dst_chan_num);
+		PRINTF("CON>> Message for channel %d\n", ch->dst_chan_num);
 		PRINTFFLUSH();
 
 		switch(cmd) { /* Drop packets for cmds we don't accept */
 	        case(QUERY): PRINTF("NOT FOR US\n");PRINTFFLUSH(); return msg;
 	        case(CONNECT): return msg;
-	        case(QACK): call KNoT.qack_handler(&home_chan, dp, src); return msg;
+	        case(QACK): call KNoT.qack_handler(&home_chan, pdp, src); return msg;
 	        case(DACK): return msg;
     	}
 	    /* Grab state for requested channel */
-		state = call ChannelTable.get_channel_state(dp->hdr.dst_chan_num);
+		state = call ChannelTable.get_channel_state(ch->dst_chan_num);
 		if (!state){ /* Attempt to kill connection if no state held */
-			PRINTF("Channel %d doesn't exist\n", dp->hdr.dst_chan_num);
+			PRINTF("Channel %d doesn't exist\n", ch->dst_chan_num);
 			state = &home_chan;
-			state->remote_chan_num = dp->hdr.src_chan_num;
+			state->remote_chan_num = ch->src_chan_num;
 			state->remote_addr = src;
-			state->seqno = dp->hdr.seqno;
+			state->seqno = pdp->dp.hdr.seqno;
 			call KNoT.close_graceful(state);
 			return msg;
-		} else if (!call KNoT.valid_seqno(state, dp)) {
+		} else if (!call KNoT.valid_seqno(state, pdp)) {
 			PRINTF("Old packet\n");
 			return msg;
 		}
 		switch(cmd) {
-			case(CACK): call KNoT.controller_cack_handler(state, dp); break;
-			case(RESPONSE): call KNoT.response_handler(state, dp); break;
-			case(RSYN): call KNoT.response_handler(state, dp); call KNoT.send_rack(state); break;
-			// case(CMDACK):   	command_ack_handler(state,dp);break;
-			case(PING): call KNoT.ping_handler(state, dp); break;
-			case(PACK): call KNoT.pack_handler(state, dp); break;
-			case(DISCONNECT): call KNoT.disconnect_handler(state, dp); 
-							  call ChannelTable.remove_channel(state->chan_num); break;
+			case(CACK): call KNoT.controller_cack_handler(state, pdp); break;
+			case(RESPONSE): call KNoT.response_handler(state, pdp); break;
+			case(RSYN): call KNoT.response_handler(state, pdp); call KNoT.send_rack(state); break;
+			// case(CMDACK):   	command_ack_handler(state,pdp);break;
+			case(PING): call KNoT.ping_handler(state, pdp); break;
+			case(PACK): call KNoT.pack_handler(state, pdp); break;
+			case(DISCONNECT): call KNoT.disconnect_handler(state, pdp); 
+		                    call ChannelTable.remove_channel(state->chan_num); break;
 			default: PRINTF("Unknown CMD type\n");
 		}
         call LEDBlink.report_received();
@@ -142,15 +170,15 @@ implementation
     }
     
 	event message_t *SerialReceive.receive(message_t *msg, void* payload, uint8_t len){
-    	DataPayload *dp = (DataPayload *)payload;
-    	void * data = &(dp->data);
-    	uint8_t cmd = dp->hdr.cmd;
-    	call LEDBlink.report_received();
+  	PDataPayload *pdp = (PDataPayload *)payload;
+  	void * data = &(pdp->dp.data);
+  	uint8_t cmd = pdp->dp.hdr.cmd;
+  	call LEDBlink.report_received();
 		
 		PRINTF("SERIAL> Serial command received.\n");
-		PRINTF("SERIAL> Packet length: %d\n", dp->dhdr.tlen);
-		PRINTF("SERIAL> Message for channel %d\n", dp->hdr.dst_chan_num);
-		PRINTF("SERIAL> Command code: %d\n", dp->hdr.cmd);
+		PRINTF("SERIAL> Packet length: %d\n", pdp->dp.dhdr.tlen);
+		//PRINTF("SERIAL> Message for channel %d\n", ch->dst_chan_num);
+		PRINTF("SERIAL> Command code: %d\n", pdp->dp.hdr.cmd);
 		PRINTFFLUSH();
 
 		switch (cmd) {

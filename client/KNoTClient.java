@@ -67,27 +67,25 @@ public class KNoTClient implements MessageListener
     void query(){
         System.out.println("Sending query");
         DataPayloadMsg msg = new DataPayloadMsg();
-        msg.set_hdr_src_chan_num((short) 0);
-        msg.set_hdr_dst_chan_num((short) 0);
-        msg.set_hdr_seqno((short) 0);
-        msg.set_hdr_cmd((short) 1);
-        msg.set_hdr_chksum((short) 0);
-        msg.set_dhdr_tlen((short) 17);
-        msg.set_data(convertStringToShort("1Client\0"));
+        msg.set_ch_src_chan_num((short) 0);
+        msg.set_ch_dst_chan_num((short) 0);
+        msg.set_dp_hdr_seqno((short) 0);
+        msg.set_dp_hdr_cmd((short) 1);
+        msg.set_dp_dhdr_tlen((short) 17);
+        msg.set_dp_data(convertStringToShort("1Client\0"));
         sendMsg(msg);
     }
 
     void connect(int addr, int rate){
         System.out.println("Initiating connection to " + addr + " at " + rate);
         DataPayloadMsg msg = new DataPayloadMsg();
-        msg.set_hdr_src_chan_num((short) 0);
-        msg.set_hdr_dst_chan_num((short) 0);
-        msg.set_hdr_seqno((short) 0);
-        msg.set_hdr_cmd((short) 3);
-        msg.set_hdr_chksum((short) 0);
-        msg.set_dhdr_tlen((short) 2);
+        msg.set_ch_src_chan_num((short) 0);
+        msg.set_ch_dst_chan_num((short) 0);
+        msg.set_dp_hdr_seqno((short) 0);
+        msg.set_dp_hdr_cmd((short) 3);
+        msg.set_dp_dhdr_tlen((short) 2);
         short data[] = {(short)addr, (short)rate};
-        msg.set_data(data);
+        msg.set_dp_data(data);
         sendMsg(msg);
     }
     // void getTweets(){
@@ -139,8 +137,8 @@ public class KNoTClient implements MessageListener
     public synchronized void messageReceived(int dest_addr, Message msg) {
         if (msg instanceof DataPayloadMsg) {
             System.out.println("Received a packet");
-            if (msg.get_hdr_cmd() == 5){
-                System.out.println("Received data: Temp is: " + )
+            if (((DataPayloadMsg)msg).get_dp_hdr_cmd() == 5){
+                System.out.println("Received data: Temp is: ");
             }
         }
         // if (msg instanceof TinyBlogMsg) {

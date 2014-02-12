@@ -18,7 +18,7 @@
                                /* 3 packets have not been received. */
 #define RSYN_RATE 15 /* Rate to send out a RSYN message */ 
 /* Memsets a Datapayload */
-#define clean_packet(dp) (memset(dp, 0, sizeof(DataPayload)))
+#define clean_packet(dp) (memset(dp, 0, sizeof(PDataPayload)))
 
 
 #define PLAIN_TEXT_MASK (0 << 7)

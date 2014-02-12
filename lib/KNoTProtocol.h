@@ -38,20 +38,23 @@
 /* =======================*/
 
 /* Macro signifying payload of 0 length */
-#define NO_PAYLOAD     0
-#define MAX_DATA_SIZE 32
+#define MAX_PACKET_SIZE    42
+#define NO_PAYLOAD          0
+#define MAX_DATA_SIZE      32
 #define RESPONSE_DATA_SIZE 16
-#define NAME_SIZE     16
-#define MAC_SIZE      4
+#define NAME_SIZE          16
+#define MAC_SIZE            4
 
-const char *cmdnames[17] = {"DUMMY", "QUERY", "QACK","CONNECT", "CACK", 
+const char *cmdnames[17] = {"DUMMY0", "QUERY", "QACK","CONNECT", "CACK", 
                                  "RSYN", "RACK", "DISCONNECT", "DACK",
                                  "COMMAND", "COMMANDACK", "PING", "PACK", "SEQNO",
-                                 "SEQACK", "DUMMY", "RESPONSE"};
-
-typedef nx_struct payload_header {
+                                 "SEQACK", "DUMMY1", "RESPONSE"};
+typedef nx_struct chan_header {
    nx_uint8_t src_chan_num;
    nx_uint8_t dst_chan_num;
+} ChanHeader;
+
+typedef nx_struct payload_header {
    nx_uint8_t seqno;   /* sequence number */
    nx_uint8_t cmd;	/* message type */
 } PayloadHeader;
@@ -63,19 +66,30 @@ typedef nx_struct data_header {
 typedef nx_struct data_payload {		/* template for data payload */
    PayloadHeader hdr;
    DataHeader dhdr;
-   nx_uint8_t data[MAX_DATA_SIZE];	/* data is address of `len' bytes */
+   nx_uint8_t data[MAX_DATA_SIZE];	/* data is address of MAX_DATA_SIZE bytes */
 } DataPayload;
 
 typedef nx_struct sec_header {
-   nx_uint8_t flags;
    nx_uint8_t tag[MAC_SIZE];
-} SecHeader;
+} SSecHeader;
 
-typedef nx_struct secure_data_payload {
-   SecHeader sh;
+typedef nx_struct symmetric_secure_data_payload {
+   nx_uint8_t flags;
+   /* 1 byte Pad */   
+   SSecHeader sh;
+   ChanHeader ch;
    DataPayload dp;
-} SecDataPayload;
+} SSecPacket;
 
+typedef nx_struct plain_data_payload {
+   ChanHeader ch;
+   DataPayload dp;
+} PDataPayload;
+
+typedef nx_struct packet {
+   nx_uint8_t flags;
+   nx_uint8_t data[MAX_PACKET_SIZE];
+} Packet;
 /* Message Payloads */
 
 typedef nx_struct query{

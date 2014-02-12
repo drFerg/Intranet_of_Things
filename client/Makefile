@@ -1,5 +1,5 @@
 GEN=DataPayloadMsg.java
-STRUCTS=data_payload
+STRUCTS=plain_data_payload
 all: client.jar
 
 serial:
@@ -9,7 +9,7 @@ client.jar: KNoTClient.class
 	jar cf $@ *.class
 
 DataPayloadMsg.java: ../lib/KNoTProtocol.h
-	mig -target=null $(CFLAGS) -java-classname=DataPayloadMsg java Payloads.h data_payload -o $@
+	mig -target=null $(CFLAGS) -java-classname=DataPayloadMsg java Payloads.h plain_data_payload -o $@
 
 #Constants.java: ../TinyBlogMsg.h
 #	ncg -target=null $(CFLAGS) -java-classname=Constants java ../TinyBlogMsg.h DIRECT_MESSAGE DATA_SIZE POST_TWEET ADD_USER GET_TWEETS INTEREST TWEET_EVENT -o $@

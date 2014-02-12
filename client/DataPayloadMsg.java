@@ -7,12 +7,12 @@
 public class DataPayloadMsg extends net.tinyos.message.Message {
 
     /** The default size of this message type in bytes. */
-    public static final int DEFAULT_MESSAGE_SIZE = 40;
+    public static final int DEFAULT_MESSAGE_SIZE = 37;
 
     /** The Active Message type associated with this message. */
     public static final int AM_TYPE = 10;
 
-    /** Create a new DataPayloadMsg of size 40. */
+    /** Create a new DataPayloadMsg of size 37. */
     public DataPayloadMsg() {
         super(DEFAULT_MESSAGE_SIZE);
         amTypeSet(AM_TYPE);
@@ -85,27 +85,24 @@ public class DataPayloadMsg extends net.tinyos.message.Message {
     public String toString() {
       String s = "Message <DataPayloadMsg> \n";
       try {
-        s += "  [hdr.src_chan_num=0x"+Long.toHexString(get_hdr_src_chan_num())+"]\n";
+        s += "  [ch.src_chan_num=0x"+Long.toHexString(get_ch_src_chan_num())+"]\n";
       } catch (ArrayIndexOutOfBoundsException aioobe) { /* Skip field */ }
       try {
-        s += "  [hdr.dst_chan_num=0x"+Long.toHexString(get_hdr_dst_chan_num())+"]\n";
+        s += "  [ch.dst_chan_num=0x"+Long.toHexString(get_ch_dst_chan_num())+"]\n";
       } catch (ArrayIndexOutOfBoundsException aioobe) { /* Skip field */ }
       try {
-        s += "  [hdr.seqno=0x"+Long.toHexString(get_hdr_seqno())+"]\n";
+        s += "  [dp.hdr.seqno=0x"+Long.toHexString(get_dp_hdr_seqno())+"]\n";
       } catch (ArrayIndexOutOfBoundsException aioobe) { /* Skip field */ }
       try {
-        s += "  [hdr.cmd=0x"+Long.toHexString(get_hdr_cmd())+"]\n";
+        s += "  [dp.hdr.cmd=0x"+Long.toHexString(get_dp_hdr_cmd())+"]\n";
       } catch (ArrayIndexOutOfBoundsException aioobe) { /* Skip field */ }
       try {
-        s += "  [hdr.chksum=0x"+Long.toHexString(get_hdr_chksum())+"]\n";
+        s += "  [dp.dhdr.tlen=0x"+Long.toHexString(get_dp_dhdr_tlen())+"]\n";
       } catch (ArrayIndexOutOfBoundsException aioobe) { /* Skip field */ }
       try {
-        s += "  [dhdr.tlen=0x"+Long.toHexString(get_dhdr_tlen())+"]\n";
-      } catch (ArrayIndexOutOfBoundsException aioobe) { /* Skip field */ }
-      try {
-        s += "  [data=";
+        s += "  [dp.data=";
         for (int i = 0; i < 32; i++) {
-          s += "0x"+Long.toHexString(getElement_data(i) & 0xff)+" ";
+          s += "0x"+Long.toHexString(getElement_dp_data(i) & 0xff)+" ";
         }
         s += "]\n";
       } catch (ArrayIndexOutOfBoundsException aioobe) { /* Skip field */ }
@@ -115,505 +112,442 @@ public class DataPayloadMsg extends net.tinyos.message.Message {
     // Message-type-specific access methods appear below.
 
     /////////////////////////////////////////////////////////
-    // Accessor methods for field: hdr.src_chan_num
-    //   Field type: short, unsigned
+    // Accessor methods for field: ch.src_chan_num
+    //   Field type: short
     //   Offset (bits): 0
     //   Size (bits): 8
     /////////////////////////////////////////////////////////
 
     /**
-     * Return whether the field 'hdr.src_chan_num' is signed (false).
+     * Return whether the field 'ch.src_chan_num' is signed (false).
      */
-    public static boolean isSigned_hdr_src_chan_num() {
+    public static boolean isSigned_ch_src_chan_num() {
         return false;
     }
 
     /**
-     * Return whether the field 'hdr.src_chan_num' is an array (false).
+     * Return whether the field 'ch.src_chan_num' is an array (false).
      */
-    public static boolean isArray_hdr_src_chan_num() {
+    public static boolean isArray_ch_src_chan_num() {
         return false;
     }
 
     /**
-     * Return the offset (in bytes) of the field 'hdr.src_chan_num'
+     * Return the offset (in bytes) of the field 'ch.src_chan_num'
      */
-    public static int offset_hdr_src_chan_num() {
+    public static int offset_ch_src_chan_num() {
         return (0 / 8);
     }
 
     /**
-     * Return the offset (in bits) of the field 'hdr.src_chan_num'
+     * Return the offset (in bits) of the field 'ch.src_chan_num'
      */
-    public static int offsetBits_hdr_src_chan_num() {
+    public static int offsetBits_ch_src_chan_num() {
         return 0;
     }
 
     /**
-     * Return the value (as a short) of the field 'hdr.src_chan_num'
+     * Return the value (as a short) of the field 'ch.src_chan_num'
      */
-    public short get_hdr_src_chan_num() {
-        return (short)getUIntBEElement(offsetBits_hdr_src_chan_num(), 8);
+    public short get_ch_src_chan_num() {
+        return (short)getUIntBEElement(offsetBits_ch_src_chan_num(), 8);
     }
 
     /**
-     * Set the value of the field 'hdr.src_chan_num'
+     * Set the value of the field 'ch.src_chan_num'
      */
-    public void set_hdr_src_chan_num(short value) {
-        setUIntBEElement(offsetBits_hdr_src_chan_num(), 8, value);
+    public void set_ch_src_chan_num(short value) {
+        setUIntBEElement(offsetBits_ch_src_chan_num(), 8, value);
     }
 
     /**
-     * Return the size, in bytes, of the field 'hdr.src_chan_num'
+     * Return the size, in bytes, of the field 'ch.src_chan_num'
      */
-    public static int size_hdr_src_chan_num() {
+    public static int size_ch_src_chan_num() {
         return (8 / 8);
     }
 
     /**
-     * Return the size, in bits, of the field 'hdr.src_chan_num'
+     * Return the size, in bits, of the field 'ch.src_chan_num'
      */
-    public static int sizeBits_hdr_src_chan_num() {
+    public static int sizeBits_ch_src_chan_num() {
         return 8;
     }
 
     /////////////////////////////////////////////////////////
-    // Accessor methods for field: hdr.dst_chan_num
-    //   Field type: short, unsigned
+    // Accessor methods for field: ch.dst_chan_num
+    //   Field type: short
     //   Offset (bits): 8
     //   Size (bits): 8
     /////////////////////////////////////////////////////////
 
     /**
-     * Return whether the field 'hdr.dst_chan_num' is signed (false).
+     * Return whether the field 'ch.dst_chan_num' is signed (false).
      */
-    public static boolean isSigned_hdr_dst_chan_num() {
+    public static boolean isSigned_ch_dst_chan_num() {
         return false;
     }
 
     /**
-     * Return whether the field 'hdr.dst_chan_num' is an array (false).
+     * Return whether the field 'ch.dst_chan_num' is an array (false).
      */
-    public static boolean isArray_hdr_dst_chan_num() {
+    public static boolean isArray_ch_dst_chan_num() {
         return false;
     }
 
     /**
-     * Return the offset (in bytes) of the field 'hdr.dst_chan_num'
+     * Return the offset (in bytes) of the field 'ch.dst_chan_num'
      */
-    public static int offset_hdr_dst_chan_num() {
+    public static int offset_ch_dst_chan_num() {
         return (8 / 8);
     }
 
     /**
-     * Return the offset (in bits) of the field 'hdr.dst_chan_num'
+     * Return the offset (in bits) of the field 'ch.dst_chan_num'
      */
-    public static int offsetBits_hdr_dst_chan_num() {
+    public static int offsetBits_ch_dst_chan_num() {
         return 8;
     }
 
     /**
-     * Return the value (as a short) of the field 'hdr.dst_chan_num'
+     * Return the value (as a short) of the field 'ch.dst_chan_num'
      */
-    public short get_hdr_dst_chan_num() {
-        return (short)getUIntBEElement(offsetBits_hdr_dst_chan_num(), 8);
+    public short get_ch_dst_chan_num() {
+        return (short)getUIntBEElement(offsetBits_ch_dst_chan_num(), 8);
     }
 
     /**
-     * Set the value of the field 'hdr.dst_chan_num'
+     * Set the value of the field 'ch.dst_chan_num'
      */
-    public void set_hdr_dst_chan_num(short value) {
-        setUIntBEElement(offsetBits_hdr_dst_chan_num(), 8, value);
+    public void set_ch_dst_chan_num(short value) {
+        setUIntBEElement(offsetBits_ch_dst_chan_num(), 8, value);
     }
 
     /**
-     * Return the size, in bytes, of the field 'hdr.dst_chan_num'
+     * Return the size, in bytes, of the field 'ch.dst_chan_num'
      */
-    public static int size_hdr_dst_chan_num() {
+    public static int size_ch_dst_chan_num() {
         return (8 / 8);
     }
 
     /**
-     * Return the size, in bits, of the field 'hdr.dst_chan_num'
+     * Return the size, in bits, of the field 'ch.dst_chan_num'
      */
-    public static int sizeBits_hdr_dst_chan_num() {
+    public static int sizeBits_ch_dst_chan_num() {
         return 8;
     }
 
     /////////////////////////////////////////////////////////
-    // Accessor methods for field: hdr.seqno
-    //   Field type: short, unsigned
+    // Accessor methods for field: dp.hdr.seqno
+    //   Field type: short
     //   Offset (bits): 16
     //   Size (bits): 8
     /////////////////////////////////////////////////////////
 
     /**
-     * Return whether the field 'hdr.seqno' is signed (false).
+     * Return whether the field 'dp.hdr.seqno' is signed (false).
      */
-    public static boolean isSigned_hdr_seqno() {
+    public static boolean isSigned_dp_hdr_seqno() {
         return false;
     }
 
     /**
-     * Return whether the field 'hdr.seqno' is an array (false).
+     * Return whether the field 'dp.hdr.seqno' is an array (false).
      */
-    public static boolean isArray_hdr_seqno() {
+    public static boolean isArray_dp_hdr_seqno() {
         return false;
     }
 
     /**
-     * Return the offset (in bytes) of the field 'hdr.seqno'
+     * Return the offset (in bytes) of the field 'dp.hdr.seqno'
      */
-    public static int offset_hdr_seqno() {
+    public static int offset_dp_hdr_seqno() {
         return (16 / 8);
     }
 
     /**
-     * Return the offset (in bits) of the field 'hdr.seqno'
+     * Return the offset (in bits) of the field 'dp.hdr.seqno'
      */
-    public static int offsetBits_hdr_seqno() {
+    public static int offsetBits_dp_hdr_seqno() {
         return 16;
     }
 
     /**
-     * Return the value (as a short) of the field 'hdr.seqno'
+     * Return the value (as a short) of the field 'dp.hdr.seqno'
      */
-    public short get_hdr_seqno() {
-        return (short)getUIntBEElement(offsetBits_hdr_seqno(), 8);
+    public short get_dp_hdr_seqno() {
+        return (short)getUIntBEElement(offsetBits_dp_hdr_seqno(), 8);
     }
 
     /**
-     * Set the value of the field 'hdr.seqno'
+     * Set the value of the field 'dp.hdr.seqno'
      */
-    public void set_hdr_seqno(short value) {
-        setUIntBEElement(offsetBits_hdr_seqno(), 8, value);
+    public void set_dp_hdr_seqno(short value) {
+        setUIntBEElement(offsetBits_dp_hdr_seqno(), 8, value);
     }
 
     /**
-     * Return the size, in bytes, of the field 'hdr.seqno'
+     * Return the size, in bytes, of the field 'dp.hdr.seqno'
      */
-    public static int size_hdr_seqno() {
+    public static int size_dp_hdr_seqno() {
         return (8 / 8);
     }
 
     /**
-     * Return the size, in bits, of the field 'hdr.seqno'
+     * Return the size, in bits, of the field 'dp.hdr.seqno'
      */
-    public static int sizeBits_hdr_seqno() {
+    public static int sizeBits_dp_hdr_seqno() {
         return 8;
     }
 
     /////////////////////////////////////////////////////////
-    // Accessor methods for field: hdr.cmd
-    //   Field type: short, unsigned
+    // Accessor methods for field: dp.hdr.cmd
+    //   Field type: short
     //   Offset (bits): 24
     //   Size (bits): 8
     /////////////////////////////////////////////////////////
 
     /**
-     * Return whether the field 'hdr.cmd' is signed (false).
+     * Return whether the field 'dp.hdr.cmd' is signed (false).
      */
-    public static boolean isSigned_hdr_cmd() {
+    public static boolean isSigned_dp_hdr_cmd() {
         return false;
     }
 
     /**
-     * Return whether the field 'hdr.cmd' is an array (false).
+     * Return whether the field 'dp.hdr.cmd' is an array (false).
      */
-    public static boolean isArray_hdr_cmd() {
+    public static boolean isArray_dp_hdr_cmd() {
         return false;
     }
 
     /**
-     * Return the offset (in bytes) of the field 'hdr.cmd'
+     * Return the offset (in bytes) of the field 'dp.hdr.cmd'
      */
-    public static int offset_hdr_cmd() {
+    public static int offset_dp_hdr_cmd() {
         return (24 / 8);
     }
 
     /**
-     * Return the offset (in bits) of the field 'hdr.cmd'
+     * Return the offset (in bits) of the field 'dp.hdr.cmd'
      */
-    public static int offsetBits_hdr_cmd() {
+    public static int offsetBits_dp_hdr_cmd() {
         return 24;
     }
 
     /**
-     * Return the value (as a short) of the field 'hdr.cmd'
+     * Return the value (as a short) of the field 'dp.hdr.cmd'
      */
-    public short get_hdr_cmd() {
-        return (short)getUIntBEElement(offsetBits_hdr_cmd(), 8);
+    public short get_dp_hdr_cmd() {
+        return (short)getUIntBEElement(offsetBits_dp_hdr_cmd(), 8);
     }
 
     /**
-     * Set the value of the field 'hdr.cmd'
+     * Set the value of the field 'dp.hdr.cmd'
      */
-    public void set_hdr_cmd(short value) {
-        setUIntBEElement(offsetBits_hdr_cmd(), 8, value);
+    public void set_dp_hdr_cmd(short value) {
+        setUIntBEElement(offsetBits_dp_hdr_cmd(), 8, value);
     }
 
     /**
-     * Return the size, in bytes, of the field 'hdr.cmd'
+     * Return the size, in bytes, of the field 'dp.hdr.cmd'
      */
-    public static int size_hdr_cmd() {
+    public static int size_dp_hdr_cmd() {
         return (8 / 8);
     }
 
     /**
-     * Return the size, in bits, of the field 'hdr.cmd'
+     * Return the size, in bits, of the field 'dp.hdr.cmd'
      */
-    public static int sizeBits_hdr_cmd() {
+    public static int sizeBits_dp_hdr_cmd() {
         return 8;
     }
 
     /////////////////////////////////////////////////////////
-    // Accessor methods for field: hdr.chksum
-    //   Field type: int, unsigned
+    // Accessor methods for field: dp.dhdr.tlen
+    //   Field type: short
     //   Offset (bits): 32
-    //   Size (bits): 16
+    //   Size (bits): 8
     /////////////////////////////////////////////////////////
 
     /**
-     * Return whether the field 'hdr.chksum' is signed (false).
+     * Return whether the field 'dp.dhdr.tlen' is signed (false).
      */
-    public static boolean isSigned_hdr_chksum() {
+    public static boolean isSigned_dp_dhdr_tlen() {
         return false;
     }
 
     /**
-     * Return whether the field 'hdr.chksum' is an array (false).
+     * Return whether the field 'dp.dhdr.tlen' is an array (false).
      */
-    public static boolean isArray_hdr_chksum() {
+    public static boolean isArray_dp_dhdr_tlen() {
         return false;
     }
 
     /**
-     * Return the offset (in bytes) of the field 'hdr.chksum'
+     * Return the offset (in bytes) of the field 'dp.dhdr.tlen'
      */
-    public static int offset_hdr_chksum() {
+    public static int offset_dp_dhdr_tlen() {
         return (32 / 8);
     }
 
     /**
-     * Return the offset (in bits) of the field 'hdr.chksum'
+     * Return the offset (in bits) of the field 'dp.dhdr.tlen'
      */
-    public static int offsetBits_hdr_chksum() {
+    public static int offsetBits_dp_dhdr_tlen() {
         return 32;
     }
 
     /**
-     * Return the value (as a int) of the field 'hdr.chksum'
+     * Return the value (as a short) of the field 'dp.dhdr.tlen'
      */
-    public int get_hdr_chksum() {
-        return (int)getUIntBEElement(offsetBits_hdr_chksum(), 16);
+    public short get_dp_dhdr_tlen() {
+        return (short)getUIntBEElement(offsetBits_dp_dhdr_tlen(), 8);
     }
 
     /**
-     * Set the value of the field 'hdr.chksum'
+     * Set the value of the field 'dp.dhdr.tlen'
      */
-    public void set_hdr_chksum(int value) {
-        setUIntBEElement(offsetBits_hdr_chksum(), 16, value);
+    public void set_dp_dhdr_tlen(short value) {
+        setUIntBEElement(offsetBits_dp_dhdr_tlen(), 8, value);
     }
 
     /**
-     * Return the size, in bytes, of the field 'hdr.chksum'
+     * Return the size, in bytes, of the field 'dp.dhdr.tlen'
      */
-    public static int size_hdr_chksum() {
-        return (16 / 8);
+    public static int size_dp_dhdr_tlen() {
+        return (8 / 8);
     }
 
     /**
-     * Return the size, in bits, of the field 'hdr.chksum'
+     * Return the size, in bits, of the field 'dp.dhdr.tlen'
      */
-    public static int sizeBits_hdr_chksum() {
-        return 16;
+    public static int sizeBits_dp_dhdr_tlen() {
+        return 8;
     }
 
     /////////////////////////////////////////////////////////
-    // Accessor methods for field: dhdr.tlen
-    //   Field type: int, unsigned
-    //   Offset (bits): 48
-    //   Size (bits): 16
-    /////////////////////////////////////////////////////////
-
-    /**
-     * Return whether the field 'dhdr.tlen' is signed (false).
-     */
-    public static boolean isSigned_dhdr_tlen() {
-        return false;
-    }
-
-    /**
-     * Return whether the field 'dhdr.tlen' is an array (false).
-     */
-    public static boolean isArray_dhdr_tlen() {
-        return false;
-    }
-
-    /**
-     * Return the offset (in bytes) of the field 'dhdr.tlen'
-     */
-    public static int offset_dhdr_tlen() {
-        return (48 / 8);
-    }
-
-    /**
-     * Return the offset (in bits) of the field 'dhdr.tlen'
-     */
-    public static int offsetBits_dhdr_tlen() {
-        return 48;
-    }
-
-    /**
-     * Return the value (as a int) of the field 'dhdr.tlen'
-     */
-    public int get_dhdr_tlen() {
-        return (int)getUIntBEElement(offsetBits_dhdr_tlen(), 16);
-    }
-
-    /**
-     * Set the value of the field 'dhdr.tlen'
-     */
-    public void set_dhdr_tlen(int value) {
-        setUIntBEElement(offsetBits_dhdr_tlen(), 16, value);
-    }
-
-    /**
-     * Return the size, in bytes, of the field 'dhdr.tlen'
-     */
-    public static int size_dhdr_tlen() {
-        return (16 / 8);
-    }
-
-    /**
-     * Return the size, in bits, of the field 'dhdr.tlen'
-     */
-    public static int sizeBits_dhdr_tlen() {
-        return 16;
-    }
-
-    /////////////////////////////////////////////////////////
-    // Accessor methods for field: data
-    //   Field type: short[], unsigned
-    //   Offset (bits): 64
+    // Accessor methods for field: dp.data
+    //   Field type: short[]
+    //   Offset (bits): 40
     //   Size of each element (bits): 8
     /////////////////////////////////////////////////////////
 
     /**
-     * Return whether the field 'data' is signed (false).
+     * Return whether the field 'dp.data' is signed (false).
      */
-    public static boolean isSigned_data() {
+    public static boolean isSigned_dp_data() {
         return false;
     }
 
     /**
-     * Return whether the field 'data' is an array (true).
+     * Return whether the field 'dp.data' is an array (true).
      */
-    public static boolean isArray_data() {
+    public static boolean isArray_dp_data() {
         return true;
     }
 
     /**
-     * Return the offset (in bytes) of the field 'data'
+     * Return the offset (in bytes) of the field 'dp.data'
      */
-    public static int offset_data(int index1) {
-        int offset = 64;
+    public static int offset_dp_data(int index1) {
+        int offset = 40;
         if (index1 < 0 || index1 >= 32) throw new ArrayIndexOutOfBoundsException();
         offset += 0 + index1 * 8;
         return (offset / 8);
     }
 
     /**
-     * Return the offset (in bits) of the field 'data'
+     * Return the offset (in bits) of the field 'dp.data'
      */
-    public static int offsetBits_data(int index1) {
-        int offset = 64;
+    public static int offsetBits_dp_data(int index1) {
+        int offset = 40;
         if (index1 < 0 || index1 >= 32) throw new ArrayIndexOutOfBoundsException();
         offset += 0 + index1 * 8;
         return offset;
     }
 
     /**
-     * Return the entire array 'data' as a short[]
+     * Return the entire array 'dp.data' as a short[]
      */
-    public short[] get_data() {
+    public short[] get_dp_data() {
         short[] tmp = new short[32];
-        for (int index0 = 0; index0 < numElements_data(0); index0++) {
-            tmp[index0] = getElement_data(index0);
+        for (int index0 = 0; index0 < numElements_dp_data(0); index0++) {
+            tmp[index0] = getElement_dp_data(index0);
         }
         return tmp;
     }
 
     /**
-     * Set the contents of the array 'data' from the given short[]
+     * Set the contents of the array 'dp.data' from the given short[]
      */
-    public void set_data(short[] value) {
+    public void set_dp_data(short[] value) {
         for (int index0 = 0; index0 < value.length; index0++) {
-            setElement_data(index0, value[index0]);
+            setElement_dp_data(index0, value[index0]);
         }
     }
 
     /**
-     * Return an element (as a short) of the array 'data'
+     * Return an element (as a short) of the array 'dp.data'
      */
-    public short getElement_data(int index1) {
-        return (short)getUIntBEElement(offsetBits_data(index1), 8);
+    public short getElement_dp_data(int index1) {
+        return (short)getUIntBEElement(offsetBits_dp_data(index1), 8);
     }
 
     /**
-     * Set an element of the array 'data'
+     * Set an element of the array 'dp.data'
      */
-    public void setElement_data(int index1, short value) {
-        setUIntBEElement(offsetBits_data(index1), 8, value);
+    public void setElement_dp_data(int index1, short value) {
+        setUIntBEElement(offsetBits_dp_data(index1), 8, value);
     }
 
     /**
-     * Return the total size, in bytes, of the array 'data'
+     * Return the total size, in bytes, of the array 'dp.data'
      */
-    public static int totalSize_data() {
+    public static int totalSize_dp_data() {
         return (256 / 8);
     }
 
     /**
-     * Return the total size, in bits, of the array 'data'
+     * Return the total size, in bits, of the array 'dp.data'
      */
-    public static int totalSizeBits_data() {
+    public static int totalSizeBits_dp_data() {
         return 256;
     }
 
     /**
-     * Return the size, in bytes, of each element of the array 'data'
+     * Return the size, in bytes, of each element of the array 'dp.data'
      */
-    public static int elementSize_data() {
+    public static int elementSize_dp_data() {
         return (8 / 8);
     }
 
     /**
-     * Return the size, in bits, of each element of the array 'data'
+     * Return the size, in bits, of each element of the array 'dp.data'
      */
-    public static int elementSizeBits_data() {
+    public static int elementSizeBits_dp_data() {
         return 8;
     }
 
     /**
-     * Return the number of dimensions in the array 'data'
+     * Return the number of dimensions in the array 'dp.data'
      */
-    public static int numDimensions_data() {
+    public static int numDimensions_dp_data() {
         return 1;
     }
 
     /**
-     * Return the number of elements in the array 'data'
+     * Return the number of elements in the array 'dp.data'
      */
-    public static int numElements_data() {
+    public static int numElements_dp_data() {
         return 32;
     }
 
     /**
-     * Return the number of elements in the array 'data'
+     * Return the number of elements in the array 'dp.data'
      * for the given dimension.
      */
-    public static int numElements_data(int dimension) {
+    public static int numElements_dp_data(int dimension) {
       int array_dims[] = { 32,  };
         if (dimension < 0 || dimension >= 1) throw new ArrayIndexOutOfBoundsException();
         if (array_dims[dimension] == 0) throw new IllegalArgumentException("Array dimension "+dimension+" has unknown size");
@@ -621,26 +555,26 @@ public class DataPayloadMsg extends net.tinyos.message.Message {
     }
 
     /**
-     * Fill in the array 'data' with a String
+     * Fill in the array 'dp.data' with a String
      */
-    public void setString_data(String s) { 
+    public void setString_dp_data(String s) { 
          int len = s.length();
          int i;
          for (i = 0; i < len; i++) {
-             setElement_data(i, (short)s.charAt(i));
+             setElement_dp_data(i, (short)s.charAt(i));
          }
-         setElement_data(i, (short)0); //null terminate
+         setElement_dp_data(i, (short)0); //null terminate
     }
 
     /**
-     * Read the array 'data' as a String
+     * Read the array 'dp.data' as a String
      */
-    public String getString_data() { 
+    public String getString_dp_data() { 
          char carr[] = new char[Math.min(net.tinyos.message.Message.MAX_CONVERTED_STRING_LENGTH,32)];
          int i;
          for (i = 0; i < carr.length; i++) {
-             if ((char)getElement_data(i) == (char)0) break;
-             carr[i] = (char)getElement_data(i);
+             if ((char)getElement_dp_data(i) == (char)0) break;
+             carr[i] = (char)getElement_dp_data(i);
          }
          return new String(carr,0,i);
     }
