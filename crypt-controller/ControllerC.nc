@@ -21,17 +21,17 @@
 
 module ControllerC @safe()
 {
-    uses {
-        interface Boot;
-        interface SplitControl as SerialControl;
-        interface AMSend as SerialSend;
-        interface Receive as SerialReceive;
-        interface Timer<TMilli> as CleanerTimer;
-        interface LEDBlink;
-        interface ChannelTable;
-        interface ChannelState;
-        interface KNoTCrypt as KNoT;
-    }
+  uses {
+    interface Boot;
+    interface SplitControl as SerialControl;
+    interface AMSend as SerialSend;
+    interface Receive as SerialReceive;
+    interface Timer<TMilli> as CleanerTimer;
+    interface LEDBlink;
+    interface ChannelTable;
+    interface ChannelState;
+    interface KNoTCrypt as KNoT;
+  }
 }
 implementation
 {
@@ -42,35 +42,35 @@ implementation
 
 		/* Checks the timer for a channel's state, retransmitting when necessary */
 	void check_timer(ChanState *state) {
-	    decrement_ticks(state);
-	    if (ticks_left(state)) return;
-	    if (attempts_left(state)) {
-        	if (in_waiting_state(state))
-        		call KNoT.send_on_chan(state, &(state->packet));
-            else 
-            	call KNoT.ping(state); /* PING A LING LONG */
-            set_ticks(state, state->ticks * 2); /* Exponential (double) retransmission */
-            decrement_attempts(state);
-            PRINTF("CLN>> Attempts left %d\n", state->attempts_left);
-            PRINTF("CLN>> Retrying packet...\n");
-	    } else {
-	        PRINTF("CLN>> CLOSING CHANNEL DUE TO TIMEOUT\n");
-            call KNoT.close_graceful(state);
-            call ChannelTable.remove_channel(state->chan_num);
-	    }
+    decrement_ticks(state);
+    if (ticks_left(state)) return;
+    if (attempts_left(state)) {
+    	if (in_waiting_state(state)) 
+        call KNoT.send_on_chan(state, &(state->packet));
+      else 
+        call KNoT.ping(state); /* PING A LING LONG */
+      set_ticks(state, state->ticks * 2); /* Exponential (double) retransmission */
+      decrement_attempts(state);
+      PRINTF("CLN>> Attempts left %d\n", state->attempts_left);
+      PRINTF("CLN>> Retrying packet...\n");
+    } else {
+      PRINTF("CLN>> CLOSING CHANNEL DUE TO TIMEOUT\n");
+      call KNoT.close_graceful(state);
+      call ChannelTable.remove_channel(state->chan_num);
+    }
 	}
 
 	/* Run once every 20ms */
 	void cleaner(){
 		ChanState *state;
 		int i = 1;
-	    for (; i < CHANNEL_NUM; i++) {
-	    	state = call ChannelTable.get_channel_state(i);
-	        if (state) check_timer(state);
-	    }
-	    /*if (home_channel_state.state != STATE_IDLE) {
-	            check_timer(&home_channel_state);
-	    }*/
+    for (; i < CHANNEL_NUM; i++) {
+    	state = call ChannelTable.get_channel_state(i);
+      if (state) check_timer(state);
+    }
+    /*if (home_channel_state.state != STATE_IDLE) {
+            check_timer(&home_channel_state);
+    }*/
 	}
       
 	/*------------------------------------------------- */
@@ -87,24 +87,24 @@ implementation
     
  	event void SerialControl.startDone(error_t error) {}
 
-    event void SerialControl.stopDone(error_t error) {}
+  event void SerialControl.stopDone(error_t error) {}
    
 /*-----------Received packet event, main state event ------------------------------- */
-    event message_t* KNoT.receive(uint8_t src, message_t* msg, void* payload, uint8_t len) {
-      uint8_t valid = 0;
-    	ChanState *state;
-    	uint8_t cmd;
-    	Packet *p = (Packet *) payload;
-      SSecPacket *sp = NULL;
-      PDataPayload *pdp = NULL;
-      ChanHeader *ch = NULL;
-		/* Gets data from the connection */
-		  PRINTF("SEC>> Received %s packet\n", is_symmetric(p->flags)?"Symmetric":
-      			                               is_asymmetric(p->flags)?"Asymmetric":"Plain");
+  event message_t* KNoT.receive(uint8_t src, message_t* msg, void* payload, uint8_t len) {
+    uint8_t valid = 0;
+  	ChanState *state;
+  	uint8_t cmd;
+  	Packet *p = (Packet *) payload;
+    SSecPacket *sp = NULL;
+    PDataPayload *pdp = NULL;
+    ChanHeader *ch = NULL;
+	/* Gets data from the connection */
+	  PRINTF("SEC>> Received %s packet\n", is_symmetric(p->flags)?"Symmetric":
+    			                               is_asymmetric(p->flags)?"Asymmetric":"Plain");
 
-		if (is_symmetric(p->flags)) {
+  	if (is_symmetric(p->flags)) {
       PRINTF("SEC>> IV: %d\n", sp->flags & (0xff >> 2));PRINTFFLUSH();
-			sp = (SSecPacket *) p;
+  		sp = (SSecPacket *) p;
       if (sp->ch.dst_chan_num) { /* Get CC for channel */ 
         state = call ChannelTable.get_channel_state(sp->ch.dst_chan_num);
         if (!state){ /* If bogus request kill bogie */
@@ -116,57 +116,67 @@ implementation
           call KNoT.close_graceful(state);
           return msg;
         }
-      } else state = &home_chan;
+      }
+      else state = &home_chan;
 
-			call KNoT.receiveDecrypt(state, sp, len, &valid);
+  		call KNoT.receiveDecrypt(state, sp, len, &valid);
       if (!valid) return msg; /* Return if decryption failed */
 
-			pdp = (PDataPayload *) (&sp->ch); /* Offsetting to start of pdp */
-		} else if (is_asymmetric(p->flags)) { 
-			return msg;
-		} else pdp = (PDataPayload *) &(p->ch);
+  		pdp = (PDataPayload *) (&sp->ch); /* Offsetting to start of pdp */
+  	} 
+    else if (is_asymmetric(p->flags)) {
+      if (!isAsymActive()) return msg; /* Don't waste time/energy */
+      switch(p->flags){
+        case(ASYM_QUERY): PRINTF("ASymQuery - create new channel\n");break;
+        case(ASYM_RESPONSE): PRINTF("ASymResponse\n");break;
+        case(ASYM_KEY_TX): PRINTF("ASymKeyTransmit\n");break;
+        default: PRINTF("Unknown type\n");
+      }
+    }
+    else pdp = (PDataPayload *) &(p->ch);
 
     ch = &(pdp->ch);
-		cmd = pdp->dp.hdr.cmd;
-		PRINTF("CON>> Received packet from Thing: %d\n", src);
-		PRINTF("CON>> Received a %s command\n", cmdnames[cmd]);
-		PRINTF("CON>> Message for channel %d\n", ch->dst_chan_num);
-		PRINTFFLUSH();
+  	cmd = pdp->dp.hdr.cmd;
+  	PRINTF("CON>> Received packet from Thing: %d\n", src);
+  	PRINTF("CON>> Received a %s command\n", cmdnames[cmd]);
+  	PRINTF("CON>> Message for channel %d\n", ch->dst_chan_num);
+  	PRINTFFLUSH();
 
-		switch(cmd) { /* Drop packets for cmds we don't accept */
-	        case(QUERY): PRINTF("NOT FOR US\n");PRINTFFLUSH(); return msg;
-	        case(CONNECT): return msg;
-	        case(QACK): call KNoT.qack_handler(&home_chan, pdp, src); return msg;
-	        case(DACK): return msg;
-    	}
-	    /* Grab state for requested channel */
-		state = call ChannelTable.get_channel_state(ch->dst_chan_num);
-		if (!state){ /* Attempt to kill connection if no state held */
-			PRINTF("Channel %d doesn't exist\n", ch->dst_chan_num);
-			state = &home_chan;
-			state->remote_chan_num = ch->src_chan_num;
-			state->remote_addr = src;
-			state->seqno = pdp->dp.hdr.seqno;
-			call KNoT.close_graceful(state);
-			return msg;
-		} else if (!call KNoT.valid_seqno(state, pdp)) {
-			PRINTF("Old packet\n");
-			return msg;
-		}
-		switch(cmd) {
-			case(CACK): call KNoT.controller_cack_handler(state, pdp); break;
-			case(RESPONSE): call KNoT.response_handler(state, pdp); break;
-			case(RSYN): call KNoT.response_handler(state, pdp); call KNoT.send_rack(state); break;
-			// case(CMDACK):   	command_ack_handler(state,pdp);break;
-			case(PING): call KNoT.ping_handler(state, pdp); break;
-			case(PACK): call KNoT.pack_handler(state, pdp); break;
-			case(DISCONNECT): call KNoT.disconnect_handler(state, pdp); 
-		                    call ChannelTable.remove_channel(state->chan_num); break;
-			default: PRINTF("Unknown CMD type\n");
-		}
-        call LEDBlink.report_received();
-        return msg; /* Return packet to TinyOS */
-    }
+  	switch(cmd) { /* Drop packets for cmds we don't accept */
+      case(QUERY): PRINTF("NOT FOR US\n");PRINTFFLUSH(); return msg;
+      case(CONNECT): return msg;
+      case(QACK): call KNoT.qack_handler(&home_chan, pdp, src); return msg;
+      case(DACK): return msg;
+  	}
+    /* Grab state for requested channel */
+  	state = call ChannelTable.get_channel_state(ch->dst_chan_num);
+  	if (!state){ /* Attempt to kill connection if no state held */
+  		PRINTF("Channel %d doesn't exist\n", ch->dst_chan_num);
+  		state = &home_chan;
+  		state->remote_chan_num = ch->src_chan_num;
+  		state->remote_addr = src;
+  		state->seqno = pdp->dp.hdr.seqno;
+  		call KNoT.close_graceful(state);
+  		return msg;
+  	} else if (!call KNoT.valid_seqno(state, pdp)) {
+  		PRINTF("Old packet\n");
+  		return msg;
+  	}
+  	switch(cmd) {
+  		case(CACK): call KNoT.controller_cack_handler(state, pdp); break;
+  		case(RESPONSE): call KNoT.response_handler(state, pdp); break;
+  		case(RSYN): call KNoT.response_handler(state, pdp); call KNoT.send_rack(state); break;
+  		// case(CMDACK):   	command_ack_handler(state,pdp);break;
+  		case(PING): call KNoT.ping_handler(state, pdp); break;
+  		case(PACK): call KNoT.pack_handler(state, pdp); break;
+  		case(DISCONNECT): call KNoT.disconnect_handler(state, pdp); 
+  	                    call ChannelTable.remove_channel(state->chan_num); break;
+  		default: PRINTF("Unknown CMD type\n");
+  	}
+    call LEDBlink.report_received();
+    return msg; /* Return packet to TinyOS */
+  }
+
     
 	event message_t *SerialReceive.receive(message_t *msg, void* payload, uint8_t len){
   	PDataPayload *pdp = (PDataPayload *)payload;
@@ -183,23 +193,22 @@ implementation
 		switch (cmd) {
 			case(QUERY): call KNoT.query(&home_chan, 1/*((QueryMsg*)dp)->type*/);break;
 			case(CONNECT): call KNoT.connect(call ChannelTable.new_channel(), 
-													((SerialConnect*)data)->addr, 
-													((SerialConnect*)data)->rate);break;
+													             ((SerialConnect*)data)->addr, 
+													             ((SerialConnect*)data)->rate);break;
 		}
 		call LEDBlink.report_received();
-    	return msg;
+  	return msg;
     }
 
  	event void SerialSend.sendDone(message_t *msg, error_t error){
-    	if (error == SUCCESS) call LEDBlink.report_sent();
-        else call LEDBlink.report_problem();
-
-        serialSendBusy = FALSE;
-    }
+  	if (error == SUCCESS) call LEDBlink.report_sent();
+    else call LEDBlink.report_problem();
+    serialSendBusy = FALSE;
+  }
 
    
-    event void CleanerTimer.fired(){
-    	cleaner();
-    }
+  event void CleanerTimer.fired(){
+  	cleaner();
+  }
 
 }

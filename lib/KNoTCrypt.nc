@@ -48,5 +48,8 @@ interface KNoTCrypt{
 	command void init_symmetric(ChanState *state, uint8_t *key, uint8_t key_size);
     command void receiveDecrypt(ChanState *state, SSecPacket *sp, uint8_t len, uint8_t *valid);
 	
+	command void init_assymetric(uint16_t *priv_key, uint16_t *pub_key_x,
+                                 uint16_t *pub_key_y, uint8_t key_size);
+
 	event message_t* receive(uint8_t src, message_t *msg, void *payload, uint8_t len);
 }

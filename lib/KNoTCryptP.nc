@@ -1,6 +1,8 @@
 #include <stdlib.h>
 #include "KNoT.h"
 #include "BlockCipher.h"
+#include "CAPublicKey.h"
+
 #if DEBUG
 #include "printf.h"
 #define PRINTF(...) printf(__VA_ARGS__)
@@ -26,7 +28,7 @@
 #endif
 
 #define FLAG_SIZE 1
-
+#define MSG_LEN 3
 
 module KNoTCryptP @safe() {
 	provides interface KNoTCrypt as KNoT;
@@ -38,7 +40,10 @@ module KNoTCryptP @safe() {
     interface SplitControl as RadioControl;
     interface LEDBlink;
     interface MiniSec;
-	}
+    interface NN;
+    interface ECC;
+    interface ECDSA;
+  }
 }
 implementation {
 	message_t am_pkt;
@@ -46,6 +51,14 @@ implementation {
 	bool serialSendBusy = FALSE;
 	bool sendBusy = FALSE;
 	CipherModeContext cc[CHANNEL_NUM + 1];
+  /* Symmetric state */
+  Point PublicKey;
+  NN_DIGIT PrivateKey[NUMWORDS];
+  uint8_t message[MSG_LEN];
+  NN_DIGIT r[NUMWORDS];
+  NN_DIGIT s[NUMWORDS];
+  uint32_t t;
+  uint8_t pass;
 
   void dp_complete(DataPayload *dp, uint8_t src, uint8_t dst, 
                uint8_t cmd, uint8_t len){
@@ -414,6 +427,23 @@ implementation {
 	command void KNoT.init_symmetric(ChanState *state, uint8_t *key, uint8_t key_size){
 		call MiniSec.init(&cc[state->chan_num], key, key_size, 7);
 
+	}
+	command void KNoT.init_assymetric(uint16_t *priv_key, uint16_t *pub_key_x,
+                                    uint16_t *pub_key_y, uint8_t key_size){
+	    //init message
+	    memset(message, 0, MSG_LEN);
+	    //init private key
+	    memset(PrivateKey, 0, NUMWORDS*NN_DIGIT_LEN);
+	    //init public key
+	    memset(PublicKey.x, 0, NUMWORDS*NN_DIGIT_LEN);
+	    memset(PublicKey.y, 0, NUMWORDS*NN_DIGIT_LEN);
+	    //init signature
+	    memset(r, 0, NUMWORDS*NN_DIGIT_LEN);
+	    memset(s, 0, NUMWORDS*NN_DIGIT_LEN);
+      memcpy(PrivateKey, priv_key, key_size*NN_DIGIT_LEN);
+      memcpy(PublicKey.x, pub_key_x, key_size*NN_DIGIT_LEN);
+      memcpy(PublicKey.y, pub_key_y, key_size*NN_DIGIT_LEN);
+      call ECC.init();
 	}
 
 /*--------------------------- EVENTS ------------------------------------------------*/
