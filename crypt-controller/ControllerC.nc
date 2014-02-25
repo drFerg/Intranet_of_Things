@@ -5,6 +5,7 @@
 #include "ChannelState.h"
 #include "KNoTProtocol.h"
 #include "KNoT.h"
+#include "ECC.h"
 #if DEBUG
 #include "printf.h"
 #define PRINTF(...) printf(__VA_ARGS__)
@@ -18,6 +19,7 @@
 #endif
 
 #define HOME_CHANNEL 0
+#define isAsymActive() 1
 
 module ControllerC @safe()
 {
@@ -39,14 +41,20 @@ implementation
 	bool serialSendBusy = FALSE;
 	uint8_t testKey[] = {0x05,0x15,0x25,0x35,0x45,0x55,0x65,0x75,0x85,0x95};
 	uint8_t testKey_size = 10;
-
-		/* Checks the timer for a channel's state, retransmitting when necessary */
+  Point publicKey = { .x = {0xe5bc, 0x07c6, 0xd567, 0x0f63, 0x39d9, 0x3287, 0x69c2, 0x9c03, 0x1e0e, 0x49b4},
+                      .y = {0x8f83, 0x0e9c, 0x3edc, 0x111c, 0x2a03, 0x6d23, 0x5ed9, 0x6701, 0x08b5, 0x26e0}
+                    };
+  Point pkc_signature = { .x = {0x6df6, 0x675b, 0x44d9, 0x3e11, 0xd26c, 0xb723, 0x5b14, 0x3b7d, 0x8fc1, 0xcfcc},
+                          .y = {0x9ffb, 0xcba4, 0xf71c, 0xfed3, 0xbdda, 0xcca6, 0x15f0, 0x4f2e, 0xe17f, 0x69ad}
+                        };
+  uint16_t privateKey[10] = {0xbf3d, 0x27bd, 0x26a3, 0xa2d7, 0x1225, 0x2cc1, 0x7899, 0xd02d, 0x914c, 0x1382};
+  /* Checks the timer for a channel's state, retransmitting when necessary */
 	void check_timer(ChanState *state) {
     decrement_ticks(state);
     if (ticks_left(state)) return;
     if (attempts_left(state)) {
     	if (in_waiting_state(state)) 
-        call KNoT.send_on_chan(state, &(state->packet));
+        call KNoT.send_on_chan(state, (PDataPayload *)&(state->packet));
       else 
         call KNoT.ping(state); /* PING A LING LONG */
       set_ticks(state, state->ticks * 2); /* Exponential (double) retransmission */

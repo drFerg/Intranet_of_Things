@@ -30,6 +30,10 @@
 #define FLAG_SIZE 1
 #define MSG_LEN 3
 
+#define NO_PUBKEY 0
+#define CA_PUBKEY 1
+#define MY_PUBKEY 2
+
 module KNoTCryptP @safe() {
 	provides interface KNoTCrypt as KNoT;
 	uses {
@@ -50,15 +54,14 @@ implementation {
 	message_t serial_pkt;
 	bool serialSendBusy = FALSE;
 	bool sendBusy = FALSE;
-	CipherModeContext cc[CHANNEL_NUM + 1];
   /* Symmetric state */
-  Point PublicKey;
-  NN_DIGIT PrivateKey[NUMWORDS];
-  uint8_t message[MSG_LEN];
-  NN_DIGIT r[NUMWORDS];
-  NN_DIGIT s[NUMWORDS];
-  uint32_t t;
+	CipherModeContext cc[CHANNEL_NUM + 1];
+  /* Asymmetric state */
+  Point *publicKey;
+  Point *signature;
+  NN_DIGIT *privateKey;
   uint8_t pass;
+  uint8_t ecdsa_state = NO_PUBKEY; /* Which pubkey is in ecdsa */
 
   void dp_complete(DataPayload *dp, uint8_t src, uint8_t dst, 
                uint8_t cmd, uint8_t len){
@@ -137,6 +140,21 @@ implementation {
 		PRINTFFLUSH();
 	}
 
+  void send_asym(int dest, ASymDataPayload *adp, uint8_t len, uint8_t flags){
+    ASSecPacket *payload = (ASSecPacket *) (call AMSend.getPayload(&am_pkt, len));
+    payload->flags = flags;
+    memcpy(&(payload->ch), adp, len);
+    if (call AMSend.send(dest, &am_pkt, len) == SUCCESS) {
+      sendBusy = TRUE;
+      //PRINTF("RADIO>> Sent a %s packet to Thing %d\n", cmdnames[payload->dp.hdr.cmd], dest);    
+      //PRINTF("RADIO>> KNoT Payload Length: %d\n", payload->dp.dhdr.tlen);
+    }
+    else {
+      PRINTF("ID: %d, Radio Msg could not be sent, channel busy\n", TOS_NODE_ID);
+      call LEDBlink.report_problem();
+    }
+    PRINTFFLUSH();
+  }
 
 
 	command int KNoT.valid_seqno(ChanState *state, PDataPayload *pdp){
@@ -158,7 +176,8 @@ implementation {
 
 	command void KNoT.knot_broadcast(ChanState *state){
 		increment_seq_no(state);
-		send_encrypted(AM_BROADCAST_ADDR, state->chan_num, &(state->packet));
+		send_encrypted(AM_BROADCAST_ADDR, state->chan_num, 
+                   (PDataPayload *)&(state->packet));
 	}
 
   command void KNoT.receiveDecrypt(ChanState *state, SSecPacket *sp, uint8_t len, uint8_t *valid){
@@ -173,7 +192,7 @@ implementation {
 
 /***** QUERY CALLS AND HANDLERS ******/
 	command void KNoT.query(ChanState* state, uint8_t type){
-		PDataPayload *new_dp = &(state->packet); 
+		PDataPayload *new_dp = (PDataPayload *)&(state->packet); 
 		QueryMsg *q;
     clean_packet(new_dp);
     pdp_complete(new_dp, HOME_CHANNEL, HOME_CHANNEL, 
@@ -412,7 +431,7 @@ implementation {
 		PDataPayload *new_pdp = (PDataPayload *) &(state->packet);
 		clean_packet(new_pdp);
 		pdp_complete(new_pdp, state->chan_num, state->remote_chan_num, 
-		           DISCONNECT, NO_PAYLOAD);
+		             DISCONNECT, NO_PAYLOAD);
 		call KNoT.send_on_chan(state, new_pdp);
 		set_state(state, STATE_DCONNECTED);
 	}
@@ -428,23 +447,48 @@ implementation {
 		call MiniSec.init(&cc[state->chan_num], key, key_size, 7);
 
 	}
-	command void KNoT.init_assymetric(uint16_t *priv_key, uint16_t *pub_key_x,
-                                    uint16_t *pub_key_y, uint8_t key_size){
-	    //init message
-	    memset(message, 0, MSG_LEN);
-	    //init private key
-	    memset(PrivateKey, 0, NUMWORDS*NN_DIGIT_LEN);
-	    //init public key
-	    memset(PublicKey.x, 0, NUMWORDS*NN_DIGIT_LEN);
-	    memset(PublicKey.y, 0, NUMWORDS*NN_DIGIT_LEN);
-	    //init signature
-	    memset(r, 0, NUMWORDS*NN_DIGIT_LEN);
-	    memset(s, 0, NUMWORDS*NN_DIGIT_LEN);
-      memcpy(PrivateKey, priv_key, key_size*NN_DIGIT_LEN);
-      memcpy(PublicKey.x, pub_key_x, key_size*NN_DIGIT_LEN);
-      memcpy(PublicKey.y, pub_key_y, key_size*NN_DIGIT_LEN);
-      call ECC.init();
-	}
+
+	command void KNoT.init_assymetric(uint16_t *priv_key, Point *pub_key, Point *pkc_sig){
+    publicKey = pub_key;
+    privateKey = priv_key;
+    signature = pkc_sig;
+    call ECC.init();
+    call ECDSA.init(&CAPublicKey);
+    ecdsa_state = CA_PUBKEY;
+  }
+
+  command void KNoT.send_asym_query(ChanState *state){
+    /* Send a packet containing signed query + PKC */
+    AsymQueryPayload *p = (AsymQueryPayload *)&state->packet;
+    memcpy(p->pkc.pubKey.x, publicKey->x, 10);
+    memcpy(p->pkc.pubKey.y, publicKey->y, 10);
+    memcpy(p->pkc.sig.r, signature->x, 10);
+    memcpy(p->pkc.sig.s, signature->y, 10);
+    p->query = 1;
+
+  }
+
+  command void KNoT.asym_query_handler(ChanState *state){
+    /* Receive a packet conaining signed query + PKC */
+    /* 1. Verify PKC with CA PubKey
+     * 2. Verify query from controller 
+     * 3. Encrypt response + nonce with controller PubKey
+     * 4. Sign encrypted response
+     * 5. Send signed + encrypted response with PKC
+     */
+  }
+
+  command void KNoT.asym_response_handler(ChanState *state){
+    /* Receive a packet containing signed + encrypted response + PKC
+     * 1. Verify PKC with CA PubKey
+     * 2. Verify response from sensor 
+     * 3. Decrypt response from sensor
+     * 4. Record response and nonce
+     * 5. Encrypt nonce + SymKey
+     * 6. Sign encrypted nonce + SymKey
+     * 7. Send signed + encrypted nonce + SymKey
+     */
+  }
 
 /*--------------------------- EVENTS ------------------------------------------------*/
    event void Boot.booted() {

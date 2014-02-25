@@ -31,6 +31,9 @@
 #define SEQACK  14
 #define RESPONSE 16
 
+#define ASYM_QUERY 17
+#define ASYM_RESPONSE 18
+#define ASYM_KEY_TX 19
 
 #define CMD_LOW QUERY
 #define CMD_HIGH RESPONSE		/* change this if commands added */
@@ -38,10 +41,11 @@
 /* =======================*/
 
 /* Macro signifying payload of 0 length */
-#define MAX_PACKET_SIZE    42
+#define MAX_PACKET_SIZE    60
 #define NO_PAYLOAD          0
 #define MAX_DATA_SIZE      32
 #define RESPONSE_DATA_SIZE 16
+#define ASYM_SIZE          50
 #define NAME_SIZE          16
 #define MAC_SIZE            4
 
@@ -69,6 +73,52 @@ typedef nx_struct data_payload {		/* template for data payload */
    nx_uint8_t data[MAX_DATA_SIZE];	/* data is address of MAX_DATA_SIZE bytes */
 } DataPayload;
 
+/*********************/
+/* Asymmetric Packet */
+typedef nx_struct pubKey {
+   nx_uint16_t x[10];
+   nx_uint16_t y[10];
+} PubKey;
+
+typedef nx_struct sig {
+   nx_uint16_t r[10];
+   nx_uint16_t s[10];
+} Signature;
+
+typedef nx_struct pkc {
+   PubKey pubKey;
+   Signature sig;
+} PKC;
+
+typedef nx_struct asym_query_payload {
+   PKC pkc;
+   nx_uint8_t query;
+} AsymQueryPayload;
+
+typedef nx_struct asym_response_payload {
+   nx_uint16_t PKC[20];
+   nx_uint16_t response[10];
+   nx_uint16_t nonce;
+} AsymResponsePayload;
+
+typedef nx_struct asym_key_tx_payload {
+   nx_uint16_t nonce;
+   nx_uint8_t sym_key[10];
+} AsymKeyTxPayload;
+
+typedef nx_struct asym_data_payload {
+   ChanHeader ch;
+   nx_uint8_t data[MAX_DATA_SIZE];
+} ASymDataPayload;
+
+typedef nx_struct asym_data_packet{
+   nx_uint8_t flags;
+   ChanHeader ch;
+   nx_uint8_t data[MAX_DATA_SIZE];
+} ASSecPacket;
+
+/********************/
+/* Symmetric Packet */
 typedef nx_struct sec_header {
    nx_uint8_t tag[MAC_SIZE];
 } SSecHeader;
@@ -81,6 +131,8 @@ typedef nx_struct symmetric_secure_data_payload {
    DataPayload dp;
 } SSecPacket;
 
+/****************/
+/* Plain Packet */
 typedef nx_struct plain_data_payload {
    ChanHeader ch;
    DataPayload dp;
@@ -91,6 +143,8 @@ typedef nx_struct packet {
    ChanHeader ch;
    DataPayload dp;
 } Packet;
+
+/********************/
 /* Message Payloads */
 
 typedef nx_struct query{
@@ -138,4 +192,5 @@ typedef nx_struct serial_cack{
    nx_uint8_t accept;
    nx_uint8_t src;
 }SerialConnectACKMsg;
+
 #endif /* KNOT_PROTOCOL_H */
