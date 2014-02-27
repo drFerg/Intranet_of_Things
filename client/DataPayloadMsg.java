@@ -7,12 +7,12 @@
 public class DataPayloadMsg extends net.tinyos.message.Message {
 
     /** The default size of this message type in bytes. */
-    public static final int DEFAULT_MESSAGE_SIZE = 37;
+    public static final int DEFAULT_MESSAGE_SIZE = 38;
 
     /** The Active Message type associated with this message. */
     public static final int AM_TYPE = 10;
 
-    /** Create a new DataPayloadMsg of size 37. */
+    /** Create a new DataPayloadMsg of size 38. */
     public DataPayloadMsg() {
         super(DEFAULT_MESSAGE_SIZE);
         amTypeSet(AM_TYPE);
@@ -239,9 +239,9 @@ public class DataPayloadMsg extends net.tinyos.message.Message {
 
     /////////////////////////////////////////////////////////
     // Accessor methods for field: dp.hdr.seqno
-    //   Field type: short
+    //   Field type: int
     //   Offset (bits): 16
-    //   Size (bits): 8
+    //   Size (bits): 16
     /////////////////////////////////////////////////////////
 
     /**
@@ -273,37 +273,37 @@ public class DataPayloadMsg extends net.tinyos.message.Message {
     }
 
     /**
-     * Return the value (as a short) of the field 'dp.hdr.seqno'
+     * Return the value (as a int) of the field 'dp.hdr.seqno'
      */
-    public short get_dp_hdr_seqno() {
-        return (short)getUIntBEElement(offsetBits_dp_hdr_seqno(), 8);
+    public int get_dp_hdr_seqno() {
+        return (int)getUIntBEElement(offsetBits_dp_hdr_seqno(), 16);
     }
 
     /**
      * Set the value of the field 'dp.hdr.seqno'
      */
-    public void set_dp_hdr_seqno(short value) {
-        setUIntBEElement(offsetBits_dp_hdr_seqno(), 8, value);
+    public void set_dp_hdr_seqno(int value) {
+        setUIntBEElement(offsetBits_dp_hdr_seqno(), 16, value);
     }
 
     /**
      * Return the size, in bytes, of the field 'dp.hdr.seqno'
      */
     public static int size_dp_hdr_seqno() {
-        return (8 / 8);
+        return (16 / 8);
     }
 
     /**
      * Return the size, in bits, of the field 'dp.hdr.seqno'
      */
     public static int sizeBits_dp_hdr_seqno() {
-        return 8;
+        return 16;
     }
 
     /////////////////////////////////////////////////////////
     // Accessor methods for field: dp.hdr.cmd
     //   Field type: short
-    //   Offset (bits): 24
+    //   Offset (bits): 32
     //   Size (bits): 8
     /////////////////////////////////////////////////////////
 
@@ -325,14 +325,14 @@ public class DataPayloadMsg extends net.tinyos.message.Message {
      * Return the offset (in bytes) of the field 'dp.hdr.cmd'
      */
     public static int offset_dp_hdr_cmd() {
-        return (24 / 8);
+        return (32 / 8);
     }
 
     /**
      * Return the offset (in bits) of the field 'dp.hdr.cmd'
      */
     public static int offsetBits_dp_hdr_cmd() {
-        return 24;
+        return 32;
     }
 
     /**
@@ -366,7 +366,7 @@ public class DataPayloadMsg extends net.tinyos.message.Message {
     /////////////////////////////////////////////////////////
     // Accessor methods for field: dp.dhdr.tlen
     //   Field type: short
-    //   Offset (bits): 32
+    //   Offset (bits): 40
     //   Size (bits): 8
     /////////////////////////////////////////////////////////
 
@@ -388,14 +388,14 @@ public class DataPayloadMsg extends net.tinyos.message.Message {
      * Return the offset (in bytes) of the field 'dp.dhdr.tlen'
      */
     public static int offset_dp_dhdr_tlen() {
-        return (32 / 8);
+        return (40 / 8);
     }
 
     /**
      * Return the offset (in bits) of the field 'dp.dhdr.tlen'
      */
     public static int offsetBits_dp_dhdr_tlen() {
-        return 32;
+        return 40;
     }
 
     /**
@@ -429,7 +429,7 @@ public class DataPayloadMsg extends net.tinyos.message.Message {
     /////////////////////////////////////////////////////////
     // Accessor methods for field: dp.data
     //   Field type: short[]
-    //   Offset (bits): 40
+    //   Offset (bits): 48
     //   Size of each element (bits): 8
     /////////////////////////////////////////////////////////
 
@@ -451,7 +451,7 @@ public class DataPayloadMsg extends net.tinyos.message.Message {
      * Return the offset (in bytes) of the field 'dp.data'
      */
     public static int offset_dp_data(int index1) {
-        int offset = 40;
+        int offset = 48;
         if (index1 < 0 || index1 >= 32) throw new ArrayIndexOutOfBoundsException();
         offset += 0 + index1 * 8;
         return (offset / 8);
@@ -461,7 +461,7 @@ public class DataPayloadMsg extends net.tinyos.message.Message {
      * Return the offset (in bits) of the field 'dp.data'
      */
     public static int offsetBits_dp_data(int index1) {
-        int offset = 40;
+        int offset = 48;
         if (index1 < 0 || index1 >= 32) throw new ArrayIndexOutOfBoundsException();
         offset += 0 + index1 * 8;
         return offset;

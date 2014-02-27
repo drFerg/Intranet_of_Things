@@ -2,6 +2,7 @@
 #include "KNoT.h"
 #include "BlockCipher.h"
 #include "CAPublicKey.h"
+#include "NN.h"
 
 #if DEBUG
 #include "printf.h"
@@ -34,6 +35,10 @@
 #define CA_PUBKEY 1
 #define MY_PUBKEY 2
 
+typedef struct asym_state {
+  Point pubKey;
+} AsymState;
+
 module KNoTCryptP @safe() {
 	provides interface KNoTCrypt as KNoT;
 	uses {
@@ -56,13 +61,19 @@ implementation {
 	bool sendBusy = FALSE;
   /* Symmetric state */
 	CipherModeContext cc[CHANNEL_NUM + 1];
+  AsymState aa[CHANNEL_NUM + 1];
   /* Asymmetric state */
   Point *publicKey;
   Point *signature;
+  Point client_sig;
   NN_DIGIT *privateKey;
-  uint8_t pass;
   uint8_t ecdsa_state = NO_PUBKEY; /* Which pubkey is in ecdsa */
-
+  /*Point publicKey = { .x = {0xe5bc, 0x07c6, 0xd567, 0x0f63, 0x39d9, 0x3287, 0x69c2, 0x9c03, 0x1e0e, 0x49b4},
+                      .y = {0x8f83, 0x0e9c, 0x3edc, 0x111c, 0x2a03, 0x6d23, 0x5ed9, 0x6701, 0x08b5, 0x26e0}
+                    };*/
+  Point pkc_signature = { .x = {0xe8ae, 0x6b16, 0xa79d, 0x163b, 0xfccc, 0xb830, 0xd7e4, 0xc5e6, 0x5c10, 0x9fa1},
+                          .y = {0x86a6, 0x5032, 0x4672, 0x89a6, 0xf5a9, 0x31e0, 0x919d, 0x7722, 0x5438, 0x7122}
+                        };
   void dp_complete(DataPayload *dp, uint8_t src, uint8_t dst, 
                uint8_t cmd, uint8_t len){
     //dp->hdr.src_chan_num = src; 
@@ -86,12 +97,13 @@ implementation {
   }
 
 	void increment_seq_no(ChanState *state){
+    PDataPayload *pdp = (PDataPayload*) &(state->packet);
 		if (state->seqno >= SEQNO_LIMIT){
 			state->seqno = SEQNO_START;
 		} else {
 			state->seqno++;
 		}
-		((PDataPayload*) &(state->packet))->dp.hdr.seqno = state->seqno;
+		pdp->dp.hdr.seqno = state->seqno;
 	}
 	
 	void send(int dest, PDataPayload *pdp){
@@ -99,6 +111,7 @@ implementation {
 		Packet *payload = (Packet *) (call AMSend.getPayload(&am_pkt, len));
     payload->flags = 0;
 		memcpy(&(payload->ch), pdp, len);
+    PRINTF("len: %d:%d\n", len, pdp->dp.dhdr.tlen);PRINTFFLUSH();
 		if (call AMSend.send(dest, &am_pkt, len) == SUCCESS) {
 			sendBusy = TRUE;
 			PRINTF("RADIO>> Sent a %s packet to Thing %d\n", cmdnames[payload->dp.hdr.cmd], dest);		
@@ -140,17 +153,21 @@ implementation {
 		PRINTFFLUSH();
 	}
 
-  void send_asym(int dest, ASymDataPayload *adp, uint8_t len, uint8_t flags){
-    ASSecPacket *payload = (ASSecPacket *) (call AMSend.getPayload(&am_pkt, len));
-    payload->flags = flags;
-    memcpy(&(payload->ch), adp, len);
+  void send_asym(int dest, PDataPayload *pdp){
+    uint8_t len = FLAG_SIZE + sizeof(ChanHeader) + sizeof(PayloadHeader) + sizeof(DataHeader) + pdp->dp.dhdr.tlen;
+    Packet *payload = (Packet *) (call AMSend.getPayload(&am_pkt, len));
+    payload->flags = 0;
+    payload->flags |= ASYMMETRIC_MASK; /* Set asymmetric flag */
+    memcpy(&(payload->ch), pdp, len);
+    PRINTF("len: %d:%d\n", len, pdp->dp.dhdr.tlen);PRINTFFLUSH();
     if (call AMSend.send(dest, &am_pkt, len) == SUCCESS) {
       sendBusy = TRUE;
-      //PRINTF("RADIO>> Sent a %s packet to Thing %d\n", cmdnames[payload->dp.hdr.cmd], dest);    
-      //PRINTF("RADIO>> KNoT Payload Length: %d\n", payload->dp.dhdr.tlen);
+      PRINTF("RADIO>> Sent a %s packet to Thing %d\n", cmdnames[payload->dp.hdr.cmd], dest);    
+      PRINTF("RADIO>> KNoT Payload Length: %d\n", payload->dp.dhdr.tlen);
     }
     else {
       PRINTF("ID: %d, Radio Msg could not be sent, channel busy\n", TOS_NODE_ID);
+      PRINTF("len: %d\n", len);
       call LEDBlink.report_problem();
     }
     PRINTFFLUSH();
@@ -448,27 +465,46 @@ implementation {
 
 	}
 
-	command void KNoT.init_assymetric(uint16_t *priv_key, Point *pub_key, Point *pkc_sig){
+	command void KNoT.init_asymmetric(uint16_t *priv_key, Point *pub_key, Point *pkc_sig){
+    PRINTF("Initing asymmetric...");PRINTFFLUSH();
     publicKey = pub_key;
     privateKey = priv_key;
     signature = pkc_sig;
     call ECC.init();
     call ECDSA.init(&CAPublicKey);
     ecdsa_state = CA_PUBKEY;
+    PRINTF("done!\n");PRINTFFLUSH();
   }
 
   command void KNoT.send_asym_query(ChanState *state){
     /* Send a packet containing signed query + PKC */
-    AsymQueryPayload *p = (AsymQueryPayload *)&state->packet;
-    memcpy(p->pkc.pubKey.x, publicKey->x, 10);
-    memcpy(p->pkc.pubKey.y, publicKey->y, 10);
-    memcpy(p->pkc.sig.r, signature->x, 10);
-    memcpy(p->pkc.sig.s, signature->y, 10);
-    p->query = 1;
-
+    PDataPayload *new_pdp = (PDataPayload *) &(state->packet);
+    AsymQueryPayload *a = (AsymQueryPayload *) &(new_pdp->dp.data);
+    uint8_t *msg = (uint8_t *) &(a->pkc.pubKey);
+    clean_packet(new_pdp);
+    memcpy(a->pkc.pubKey.x, publicKey->x, 20);
+    memcpy(a->pkc.pubKey.y, publicKey->y, 20);
+    a->query = 1;
+    memcpy(a->pkc.sig.r, signature->x, 20);
+    memcpy(a->pkc.sig.s, signature->y, 20);
+    pdp_complete(new_pdp, HOME_CHANNEL, HOME_CHANNEL, 
+                 ASYM_QUERY, sizeof(AsymQueryPayload));
+    send_asym(AM_BROADCAST_ADDR, new_pdp);
   }
 
-  command void KNoT.asym_query_handler(ChanState *state){
+  command uint8_t KNoT.asym_query_handler(ChanState *state, PDataPayload *pdp){
+    uint32_t start_t, end_t;
+    uint8_t pass = 0;
+    AsymQueryPayload *a = (AsymQueryPayload *) &(pdp->dp.data);
+    uint8_t *msg = (uint8_t *) &(aa[0].pubKey);
+    memcpy(aa[0].pubKey.x, a->pkc.pubKey.x, 20);
+    memcpy(aa[0].pubKey.y, a->pkc.pubKey.y, 20);
+    memcpy(client_sig.x, a->pkc.sig.r, 20);
+    memcpy(client_sig.y, a->pkc.sig.s, 20);
+    pass = call ECDSA.verify(msg, sizeof(Point), (NN_DIGIT *) (client_sig.x), 
+                             (NN_DIGIT *) (client_sig.y), &CAPublicKey);
+    PRINTF("PASS: %d\n", pass);PRINTFFLUSH();
+    return pass;
     /* Receive a packet conaining signed query + PKC */
     /* 1. Verify PKC with CA PubKey
      * 2. Verify query from controller 
@@ -502,7 +538,7 @@ implementation {
     event void RadioControl.startDone(error_t error) {
     	PRINTF("*********************\n*** RADIO BOOTED ****\n*********************\n");
     	PRINTF("RADIO>> ADDR: %d\n", call AMPacket.address());
-        PRINTFFLUSH();
+      PRINTFFLUSH();
     }
 
     event void RadioControl.stopDone(error_t error) {}

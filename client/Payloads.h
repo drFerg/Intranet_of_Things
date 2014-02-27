@@ -16,7 +16,7 @@ typedef nx_struct chan_header {
 } ChanHeader;
 
 typedef nx_struct payload_header {
-   nx_uint8_t seqno;   /* sequence number */
+   nx_uint16_t seqno;   /* sequence number */
    nx_uint8_t cmd;  /* message type */
 } PayloadHeader;
 

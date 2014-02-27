@@ -41,25 +41,26 @@
 /* =======================*/
 
 /* Macro signifying payload of 0 length */
-#define MAX_PACKET_SIZE    60
+#define MAX_PACKET_SIZE    90
 #define NO_PAYLOAD          0
-#define MAX_DATA_SIZE      32
+#define MAX_DATA_SIZE      84
 #define RESPONSE_DATA_SIZE 16
-#define ASYM_SIZE          50
+#define ASYM_SIZE          84
 #define NAME_SIZE          16
 #define MAC_SIZE            4
 
-const char *cmdnames[17] = {"DUMMY0", "QUERY", "QACK","CONNECT", "CACK", 
-                                 "RSYN", "RACK", "DISCONNECT", "DACK",
-                                 "COMMAND", "COMMANDACK", "PING", "PACK", "SEQNO",
-                                 "SEQACK", "DUMMY1", "RESPONSE"};
+const char *cmdnames[20] = {"DUMMY0", "QUERY", "QACK","CONNECT", "CACK", 
+                            "RSYN", "RACK", "DISCONNECT", "DACK",
+                            "COMMAND", "COMMANDACK", "PING", "PACK", "SEQNO",
+                            "SEQACK", "DUMMY1", "RESPONSE", "ASYM_QUERY",
+                            "ASYM_RESPONSE", "ASYM_KEY_TX"};
 typedef nx_struct chan_header {
    nx_uint8_t src_chan_num;
    nx_uint8_t dst_chan_num;
 } ChanHeader;
 
 typedef nx_struct payload_header {
-   nx_uint8_t seqno;   /* sequence number */
+   nx_uint16_t seqno;   /* sequence number */
    nx_uint8_t cmd;	/* message type */
 } PayloadHeader;
 
@@ -105,17 +106,6 @@ typedef nx_struct asym_key_tx_payload {
    nx_uint16_t nonce;
    nx_uint8_t sym_key[10];
 } AsymKeyTxPayload;
-
-typedef nx_struct asym_data_payload {
-   ChanHeader ch;
-   nx_uint8_t data[MAX_DATA_SIZE];
-} ASymDataPayload;
-
-typedef nx_struct asym_data_packet{
-   nx_uint8_t flags;
-   ChanHeader ch;
-   nx_uint8_t data[MAX_DATA_SIZE];
-} ASSecPacket;
 
 /********************/
 /* Symmetric Packet */

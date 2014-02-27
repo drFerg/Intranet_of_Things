@@ -1,5 +1,5 @@
 #change the packet length to 102 bytes
-MSG_SIZE=102
+#MSG_SIZE=102
 
 #increase the queue size to 256
 #PFLAGS += -DTOSH_MAX_TASKS_LOG2=6
@@ -29,7 +29,7 @@ CFLAGS+=-DPROJECTIVE  #projective coordinate
 CFLAGS+=-DSLIDING_WIN  #sliding window method, windows size is defined in ECC.h
 
 CFLAGS += -I$(TOSDIR)/lib/printf 
-CFLAGS += -DTOSH_DATA_LENGTH=40
+CFLAGS += -DTOSH_DATA_LENGTH=100
 CFLAGS += -DDEBUG -DTELOS 
 CFLAGS += -DDEVICE_NAME=\"TEST\" -I../lib -DCHANNEL_NUM=5
 CFLAGS += -I../../TinyECC-2.0

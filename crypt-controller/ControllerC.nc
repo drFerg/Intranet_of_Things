@@ -44,8 +44,8 @@ implementation
   Point publicKey = { .x = {0xe5bc, 0x07c6, 0xd567, 0x0f63, 0x39d9, 0x3287, 0x69c2, 0x9c03, 0x1e0e, 0x49b4},
                       .y = {0x8f83, 0x0e9c, 0x3edc, 0x111c, 0x2a03, 0x6d23, 0x5ed9, 0x6701, 0x08b5, 0x26e0}
                     };
-  Point pkc_signature = { .x = {0x6df6, 0x675b, 0x44d9, 0x3e11, 0xd26c, 0xb723, 0x5b14, 0x3b7d, 0x8fc1, 0xcfcc},
-                          .y = {0x9ffb, 0xcba4, 0xf71c, 0xfed3, 0xbdda, 0xcca6, 0x15f0, 0x4f2e, 0xe17f, 0x69ad}
+  Point pkc_signature = { .x = {0xe8ae, 0x6b16, 0xa79d, 0x163b, 0xfccc, 0xb830, 0xd7e4, 0xc5e6, 0x5c10, 0x9fa1},
+                          .y = {0x86a6, 0x5032, 0x4672, 0x89a6, 0xf5a9, 0x31e0, 0x919d, 0x7722, 0x5438, 0x7122}
                         };
   uint16_t privateKey[10] = {0xbf3d, 0x27bd, 0x26a3, 0xa2d7, 0x1225, 0x2cc1, 0x7899, 0xd02d, 0x914c, 0x1382};
   /* Checks the timer for a channel's state, retransmitting when necessary */
@@ -91,6 +91,7 @@ implementation
     call ChannelState.init_state(&home_chan, 0);
     call CleanerTimer.startPeriodic(TICK_RATE);
     call KNoT.init_symmetric(&home_chan, testKey, testKey_size);
+    call KNoT.init_asymmetric(privateKey, &publicKey, &pkc_signature);
     }
     
  	event void SerialControl.startDone(error_t error) {}
@@ -134,12 +135,15 @@ implementation
   	} 
     else if (is_asymmetric(p->flags)) {
       if (!isAsymActive()) return msg; /* Don't waste time/energy */
-      switch(p->flags){
-        case(ASYM_QUERY): PRINTF("ASymQuery - create new channel\n");break;
+      pdp = (PDataPayload *) &(p->ch);
+      switch(pdp->dp.hdr.cmd){
+        case(ASYM_QUERY): PRINTF("ASymQuery - create new channel\n"); 
+                          call KNoT.asym_query_handler(&home_chan, pdp);break;
         case(ASYM_RESPONSE): PRINTF("ASymResponse\n");break;
         case(ASYM_KEY_TX): PRINTF("ASymKeyTransmit\n");break;
         default: PRINTF("Unknown type\n");
       }
+      return msg;
     }
     else pdp = (PDataPayload *) &(p->ch);
 
@@ -199,7 +203,8 @@ implementation
 		PRINTFFLUSH();
 
 		switch (cmd) {
-			case(QUERY): call KNoT.query(&home_chan, 1/*((QueryMsg*)dp)->type*/);break;
+			case(QUERY): call KNoT.send_asym_query(&home_chan);break;
+      //case(QUERY): call KNoT.query(&home_chan, 1/*((QueryMsg*)dp)->type*/);break;
 			case(CONNECT): call KNoT.connect(call ChannelTable.new_channel(), 
 													             ((SerialConnect*)data)->addr, 
 													             ((SerialConnect*)data)->rate);break;
