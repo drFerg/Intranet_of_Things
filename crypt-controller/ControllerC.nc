@@ -20,6 +20,7 @@
 
 #define HOME_CHANNEL 0
 #define isAsymActive() 1
+#define VALID_PKC 1
 
 module ControllerC @safe()
 {
@@ -136,12 +137,32 @@ implementation
     else if (is_asymmetric(p->flags)) {
       if (!isAsymActive()) return msg; /* Don't waste time/energy */
       pdp = (PDataPayload *) &(p->ch);
-      switch(pdp->dp.hdr.cmd){
-        case(ASYM_QUERY): PRINTF("ASymQuery - create new channel\n"); 
-                          call KNoT.asym_query_handler(&home_chan, pdp);break;
-        case(ASYM_RESPONSE): PRINTF("ASymResponse\n");break;
-        case(ASYM_KEY_TX): PRINTF("ASymKeyTransmit\n");break;
-        default: PRINTF("Unknown type\n");
+      if (pdp->dp.hdr.cmd = ASYM_QUERY){
+        if (call KNoT.asym_pkc_handler(&home_chan, pdp) != VALID_PKC) return msg;
+        state = call ChannelTable.new_channel();
+        state->remote_addr = src;
+        state->seqno = pdp->dp.hdr.seqno;
+        call KNoT.send_asym_resp(state);
+        set_state(state, STATE_ASYM_RESP);
+      }
+      else if (pdp->dp.hdr.cmd == ASYM_RESPONSE){
+        if (call KNoT.asym_pkc_handler(&home_chan, pdp) != VALID_PKC) return msg;
+        state = call ChannelTable.new_channel();
+        state->remote_addr = src;
+        state->seqno = pdp->dp.hdr.seqno;
+        call KNoT.send_resp_ack(state);
+        set_state(state, STATE_ASYM_RESP);
+      }
+      else if (pdp->dp.hdr.cmd == ASYM_RESP_ACK){
+        state = call ChannelTable.get_channel_state(ch->dst_chan_num);
+        if (!state) return msg;
+        call KNoT.asym_request_key(state);
+        set_state(state, STATE_ASYM_REQ_KEY);
+      }
+      else if (pdp->dp.hdr.cmd == ASYM_KEY_REQ){
+        state = call ChannelTable.get_channel_state(ch->dst_chan_num);
+        if (!state) return msg;
+        call KNoT.asym_key_request_handler(state);
       }
       return msg;
     }

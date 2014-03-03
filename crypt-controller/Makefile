@@ -29,7 +29,7 @@ CFLAGS+=-DPROJECTIVE  #projective coordinate
 CFLAGS+=-DSLIDING_WIN  #sliding window method, windows size is defined in ECC.h
 
 CFLAGS += -I$(TOSDIR)/lib/printf 
-CFLAGS += -DTOSH_DATA_LENGTH=100
+CFLAGS += -DTOSH_DATA_LENGTH=120
 CFLAGS += -DDEBUG -DTELOS 
 CFLAGS += -DDEVICE_NAME=\"TEST\" -I../lib -DCHANNEL_NUM=5
 CFLAGS += -I../../TinyECC-2.0

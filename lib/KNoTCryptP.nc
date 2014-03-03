@@ -37,6 +37,7 @@
 
 typedef struct asym_state {
   Point pubKey;
+  uint32_t nonce;
 } AsymState;
 
 module KNoTCryptP @safe() {
@@ -74,6 +75,14 @@ implementation {
   Point pkc_signature = { .x = {0xe8ae, 0x6b16, 0xa79d, 0x163b, 0xfccc, 0xb830, 0xd7e4, 0xc5e6, 0x5c10, 0x9fa1},
                           .y = {0x86a6, 0x5032, 0x4672, 0x89a6, 0xf5a9, 0x31e0, 0x919d, 0x7722, 0x5438, 0x7122}
                         };
+  void copy_pkc(AsymQueryPayload aqp, Point pubKey, Point sig){
+    memcpy(aqp->pkc.pubKey.x, pubKey->x, 20);
+    memcpy(aqp->pkc.pubKey.y, pubKey->y, 20);
+    memcpy(aqp->pkc.sig.r, sig->x, 20);
+    memcpy(aqp->pkc.sig.s, sig->y, 20);
+  }
+
+
   void dp_complete(DataPayload *dp, uint8_t src, uint8_t dst, 
                uint8_t cmd, uint8_t len){
     //dp->hdr.src_chan_num = src; 
@@ -480,19 +489,15 @@ implementation {
     /* Send a packet containing signed query + PKC */
     PDataPayload *new_pdp = (PDataPayload *) &(state->packet);
     AsymQueryPayload *a = (AsymQueryPayload *) &(new_pdp->dp.data);
-    uint8_t *msg = (uint8_t *) &(a->pkc.pubKey);
     clean_packet(new_pdp);
-    memcpy(a->pkc.pubKey.x, publicKey->x, 20);
-    memcpy(a->pkc.pubKey.y, publicKey->y, 20);
-    a->query = 1;
-    memcpy(a->pkc.sig.r, signature->x, 20);
-    memcpy(a->pkc.sig.s, signature->y, 20);
+    copy_pkc(a, publicKey, signature);
     pdp_complete(new_pdp, HOME_CHANNEL, HOME_CHANNEL, 
                  ASYM_QUERY, sizeof(AsymQueryPayload));
     send_asym(AM_BROADCAST_ADDR, new_pdp);
   }
 
-  command uint8_t KNoT.asym_query_handler(ChanState *state, PDataPayload *pdp){
+  command uint8_t KNoT.asym_pkc_handler(ChanState *state, PDataPayload *pdp){
+    /* Verify PKC using CA PubKey */
     uint32_t start_t, end_t;
     uint8_t pass = 0;
     AsymQueryPayload *a = (AsymQueryPayload *) &(pdp->dp.data);
@@ -505,13 +510,33 @@ implementation {
                              (NN_DIGIT *) (client_sig.y), &CAPublicKey);
     PRINTF("PASS: %d\n", pass);PRINTFFLUSH();
     return pass;
-    /* Receive a packet conaining signed query + PKC */
-    /* 1. Verify PKC with CA PubKey
-     * 2. Verify query from controller 
-     * 3. Encrypt response + nonce with controller PubKey
+  }
+
+  command void KNoT.send_asym_resp(ChanState *state){
+    /* Send a packet containing signed query + PKC */
+    PDataPayload *new_pdp = (PDataPayload *) &(state->packet);
+    AsymQueryPayload *a = (AsymQueryPayload *) &(new_pdp->dp.data);
+    clean_packet(new_pdp);
+    copy_pkc(a, publicKey, signature);
+    pdp_complete(new_pdp, chan->chan_num, HOME_CHANNEL, 
+                 ASYM_RESPONSE, sizeof(AsymQueryPayload));
+    send_asym(chan->remote_addr, new_pdp);
+  }
+
+  command void KNOT.send_resp_ack(ChanState *state){
+    PDataPayload *new_pdp = (PDataPayload *) &(state->packet);
+    AsymQueryPayload *a = (AsymQueryPayload *) &(new_pdp->dp.data);
+    clean_packet(new_pdp);
+    pdp_complete(new_pdp, chan->chan_num, HOME_CHANNEL, 
+                 ASYM_RESP_ACK, sizeof(AsymRespACKPaylod));
+    send_asym(chan->remote_addr, new_pdp);
+  }
+
+  command void KNoT.asym_request_key(ChanState *state){
+     /* 3. Encrypt response + nonce with controller PubKey
      * 4. Sign encrypted response
      * 5. Send signed + encrypted response with PKC
-     */
+   */  
   }
 
   command void KNoT.asym_response_handler(ChanState *state){
