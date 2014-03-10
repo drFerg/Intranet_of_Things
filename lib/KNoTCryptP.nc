@@ -533,7 +533,7 @@ implementation {
     PDataPayload *new_pdp = (PDataPayload *) &(state->packet);
     AsymQueryPayload *a = (AsymQueryPayload *) &(new_pdp->dp.data);
     clean_packet(new_pdp);
-    pdp_complete(new_pdp, state->chan_num, HOME_CHANNEL, 
+    pdp_complete(new_pdp, state->chan_num, state->remote_chan_num, 
                  ASYM_RESP_ACK, sizeof(AsymRespACKPayload));
     send_asym(state->remote_addr, new_pdp);
   }
@@ -544,13 +544,19 @@ implementation {
     PDataPayload *new_pdp = (PDataPayload *) &(state->packet);
     AsymKeyRequestPayload *a = (AsymKeyRequestPayload *) &(new_pdp->dp.data);
     clean_packet(new_pdp);
-    clen = call ECIES.encrypt((uint8_t*) (a->e_nonce), NONCE_CIPHER_LEN, 
+    PRINTF("Encrypting Nonce..."); PRINTFFLUSH();
+    clen = call ECIES.encrypt((uint8_t*) a->e_nonce, NONCE_CIPHER_LEN, 
                               (uint8_t *) &nonce, M_LEN, 
                               &(aa[state->chan_num].pubKey));
-     /* 3. Encrypt response + nonce with controller PubKey
-     * 4. Sign encrypted response
-     * 5. Send signed + encrypted response with PKC
-   */  
+    PRINTF("Done.\nSigning Nonce..."); PRINTFFLUSH();
+    call ECDSA.sign((uint8_t *) a->e_nonce, NONCE_CIPHER_LEN, 
+                    (uint16_t *)a->sig.r, (uint16_t *)a->sig.s,
+                    privateKey);
+    PRINTF("Done.\n"); PRINTFFLUSH();
+    pdp_complete(new_pdp, state->chan_num, state->remote_chan_num, 
+                 ASYM_KEY_REQ, sizeof(AsymKeyRequestPayload));
+    send_asym(state->remote_addr, new_pdp);
+     /* 5. Send signed + encrypted response with PKC */  
   }
 
   command void KNoT.asym_key_request_handler(ChanState *state, PDataPayload *pdp){

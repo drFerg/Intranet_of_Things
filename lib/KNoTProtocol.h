@@ -106,7 +106,7 @@ typedef nx_struct asym_resp_ack_payload {
 
 typedef nx_struct asym_response_payload {
    nx_uint8_t e_nonce[E_NONCE_SIZE];
-   Signature nonce_sig;
+   Signature sig;
 } AsymKeyRequestPayload; /* 85bytes */
 
 typedef nx_struct asym_key_tx_payload {
