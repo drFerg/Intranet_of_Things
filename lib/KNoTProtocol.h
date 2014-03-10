@@ -33,7 +33,10 @@
 
 #define ASYM_QUERY 17
 #define ASYM_RESPONSE 18
-#define ASYM_KEY_TX 19
+#define ASYM_RESP_ACK 19
+#define ASYM_KEY_REQ  21
+#define ASYM_KEY_TX 22
+
 
 #define CMD_LOW QUERY
 #define CMD_HIGH RESPONSE		/* change this if commands added */
@@ -48,7 +51,7 @@
 #define ASYM_SIZE          84
 #define NAME_SIZE          16
 #define MAC_SIZE            4
-#define ENC_NONCE_SIZE     45 /* 4(nonce) + 20(KEY_SIZE) + 1 + 20(HMAC) */ 
+#define E_NONCE_SIZE       45 /* 4(nonce) + 20(KEY_SIZE) + 1 + 20(HMAC) */ 
 
 const char *cmdnames[20] = {"DUMMY0", "QUERY", "QACK","CONNECT", "CACK", 
                             "RSYN", "RACK", "DISCONNECT", "DACK",
@@ -97,14 +100,14 @@ typedef nx_struct asym_query_payload {
    nx_uint8_t flags; /* handshake/cipherSpec? */
 } AsymQueryPayload; /* 81bytes */
 
-typedef nx_struct asym_query_payload {
+typedef nx_struct asym_resp_ack_payload {
    nx_uint8_t flags;
 } AsymRespACKPayload; /* 81bytes */
 
 typedef nx_struct asym_response_payload {
-   nx_uint8_t enc_nonce[ENC_NONCE_SIZE];
+   nx_uint8_t e_nonce[E_NONCE_SIZE];
    Signature nonce_sig;
-} AsymResponsePayload; /* 85bytes */
+} AsymKeyRequestPayload; /* 85bytes */
 
 typedef nx_struct asym_key_tx_payload {
    nx_uint16_t nonce;

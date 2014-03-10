@@ -17,7 +17,10 @@
 #define STATE_COMMANDED  9
 #define STATE_RSYN       10
 #define STATE_RACK_WAIT  11
-
+#define STATE_ASYM_QUERY 12
+#define STATE_ASYM_RESP  13
+#define STATE_ASYM_RESP_ACK 14
+#define STATE_ASYM_REQ_KEY 15
 /* Sets the channel state to the specified state */
 #define set_state(chanstate, status) chanstate->state = status
 

@@ -81,6 +81,20 @@ implementation
             check_timer(&home_channel_state);
     }*/
 	}
+
+
+  uint8_t pkc_verification(PDataPayload *pdp, uint8_t src){
+    /*Assume most certificates will be good */
+    ChanState *state = call ChannelTable.new_channel(); 
+    if (call KNoT.asym_pkc_handler(state, pdp) != VALID_PKC) {
+      call ChannelTable.remove_channel(state->chan_num);
+      return 0;
+    }
+    state = call ChannelTable.new_channel();
+    state->remote_addr = src;
+    state->seqno = pdp->dp.hdr.seqno;
+    return state->chan_num;
+  }
       
 	/*------------------------------------------------- */
 	
@@ -137,19 +151,13 @@ implementation
     else if (is_asymmetric(p->flags)) {
       if (!isAsymActive()) return msg; /* Don't waste time/energy */
       pdp = (PDataPayload *) &(p->ch);
-      if (pdp->dp.hdr.cmd = ASYM_QUERY){
-        if (call KNoT.asym_pkc_handler(&home_chan, pdp) != VALID_PKC) return msg;
-        state = call ChannelTable.new_channel();
-        state->remote_addr = src;
-        state->seqno = pdp->dp.hdr.seqno;
+      if (pdp->dp.hdr.cmd == ASYM_QUERY){
+        if (pkc_verification(pdp, src) == FAIL) return msg;
         call KNoT.send_asym_resp(state);
         set_state(state, STATE_ASYM_RESP);
       }
       else if (pdp->dp.hdr.cmd == ASYM_RESPONSE){
-        if (call KNoT.asym_pkc_handler(&home_chan, pdp) != VALID_PKC) return msg;
-        state = call ChannelTable.new_channel();
-        state->remote_addr = src;
-        state->seqno = pdp->dp.hdr.seqno;
+        if (pkc_verification(pdp, src) == FAIL) return msg;
         call KNoT.send_resp_ack(state);
         set_state(state, STATE_ASYM_RESP);
       }
@@ -162,7 +170,7 @@ implementation
       else if (pdp->dp.hdr.cmd == ASYM_KEY_REQ){
         state = call ChannelTable.get_channel_state(ch->dst_chan_num);
         if (!state) return msg;
-        call KNoT.asym_key_request_handler(state);
+        call KNoT.asym_key_request_handler(state, pdp);
       }
       return msg;
     }

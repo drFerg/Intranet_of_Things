@@ -49,10 +49,15 @@ interface KNoTCrypt{
     command void receiveDecrypt(ChanState *state, SSecPacket *sp, uint8_t len, uint8_t *valid);
 	
 	command void init_asymmetric(uint16_t *priv_key, Point *pub_key, Point *pkc_sig);
+	
 	command void send_asym_query(ChanState *state);
-	command uint8_t asym_pkc_handler(ChanState *state, PDataPayload *pdp);	
 	command void send_asym_resp(ChanState *state);
 	command void send_resp_ack(ChanState *state);
+
+	command uint8_t asym_pkc_handler(ChanState *state, PDataPayload *pdp);	
+
+	command void asym_request_key(ChanState *state);
+	command void asym_key_request_handler(ChanState *state, PDataPayload *pdp);
 
 
 	event message_t* receive(uint8_t src, message_t *msg, void *payload, uint8_t len);

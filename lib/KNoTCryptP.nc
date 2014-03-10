@@ -35,6 +35,10 @@
 #define CA_PUBKEY 1
 #define MY_PUBKEY 2
 
+#define M_LEN 4
+                         /* 4(nonce) + 20(KEY_SIZE) + 1 + 20(HMAC) */ 
+#define NONCE_CIPHER_LEN M_LEN + KEYDIGITS * NN_DIGIT_LEN + 1  + HMAC_LEN
+
 typedef struct asym_state {
   Point pubKey;
   uint32_t nonce;
@@ -53,6 +57,8 @@ module KNoTCryptP @safe() {
     interface NN;
     interface ECC;
     interface ECDSA;
+    interface ECIES;
+    interface Random;
   }
 }
 implementation {
@@ -75,7 +81,7 @@ implementation {
   Point pkc_signature = { .x = {0xe8ae, 0x6b16, 0xa79d, 0x163b, 0xfccc, 0xb830, 0xd7e4, 0xc5e6, 0x5c10, 0x9fa1},
                           .y = {0x86a6, 0x5032, 0x4672, 0x89a6, 0xf5a9, 0x31e0, 0x919d, 0x7722, 0x5438, 0x7122}
                         };
-  void copy_pkc(AsymQueryPayload aqp, Point pubKey, Point sig){
+  void copy_pkc(AsymQueryPayload *aqp, Point *pubKey, Point *sig){
     memcpy(aqp->pkc.pubKey.x, pubKey->x, 20);
     memcpy(aqp->pkc.pubKey.y, pubKey->y, 20);
     memcpy(aqp->pkc.sig.r, sig->x, 20);
@@ -501,9 +507,9 @@ implementation {
     uint32_t start_t, end_t;
     uint8_t pass = 0;
     AsymQueryPayload *a = (AsymQueryPayload *) &(pdp->dp.data);
-    uint8_t *msg = (uint8_t *) &(aa[0].pubKey);
-    memcpy(aa[0].pubKey.x, a->pkc.pubKey.x, 20);
-    memcpy(aa[0].pubKey.y, a->pkc.pubKey.y, 20);
+    uint8_t *msg = (uint8_t *) &(aa[state->chan_num].pubKey);
+    memcpy(aa[state->chan_num].pubKey.x, a->pkc.pubKey.x, 20);
+    memcpy(aa[state->chan_num].pubKey.y, a->pkc.pubKey.y, 20);
     memcpy(client_sig.x, a->pkc.sig.r, 20);
     memcpy(client_sig.y, a->pkc.sig.s, 20);
     pass = call ECDSA.verify(msg, sizeof(Point), (NN_DIGIT *) (client_sig.x), 
@@ -518,28 +524,36 @@ implementation {
     AsymQueryPayload *a = (AsymQueryPayload *) &(new_pdp->dp.data);
     clean_packet(new_pdp);
     copy_pkc(a, publicKey, signature);
-    pdp_complete(new_pdp, chan->chan_num, HOME_CHANNEL, 
+    pdp_complete(new_pdp, state->chan_num, HOME_CHANNEL, 
                  ASYM_RESPONSE, sizeof(AsymQueryPayload));
-    send_asym(chan->remote_addr, new_pdp);
+    send_asym(state->remote_addr, new_pdp);
   }
 
-  command void KNOT.send_resp_ack(ChanState *state){
+  command void KNoT.send_resp_ack(ChanState *state){
     PDataPayload *new_pdp = (PDataPayload *) &(state->packet);
     AsymQueryPayload *a = (AsymQueryPayload *) &(new_pdp->dp.data);
     clean_packet(new_pdp);
-    pdp_complete(new_pdp, chan->chan_num, HOME_CHANNEL, 
-                 ASYM_RESP_ACK, sizeof(AsymRespACKPaylod));
-    send_asym(chan->remote_addr, new_pdp);
+    pdp_complete(new_pdp, state->chan_num, HOME_CHANNEL, 
+                 ASYM_RESP_ACK, sizeof(AsymRespACKPayload));
+    send_asym(state->remote_addr, new_pdp);
   }
 
   command void KNoT.asym_request_key(ChanState *state){
+    uint8_t clen;
+    uint32_t nonce = call Random.rand32();
+    PDataPayload *new_pdp = (PDataPayload *) &(state->packet);
+    AsymKeyRequestPayload *a = (AsymKeyRequestPayload *) &(new_pdp->dp.data);
+    clean_packet(new_pdp);
+    clen = call ECIES.encrypt((uint8_t*) (a->e_nonce), NONCE_CIPHER_LEN, 
+                              (uint8_t *) &nonce, M_LEN, 
+                              &(aa[state->chan_num].pubKey));
      /* 3. Encrypt response + nonce with controller PubKey
      * 4. Sign encrypted response
      * 5. Send signed + encrypted response with PKC
    */  
   }
 
-  command void KNoT.asym_response_handler(ChanState *state){
+  command void KNoT.asym_key_request_handler(ChanState *state, PDataPayload *pdp){
     /* Receive a packet containing signed + encrypted response + PKC
      * 1. Verify PKC with CA PubKey
      * 2. Verify response from sensor 

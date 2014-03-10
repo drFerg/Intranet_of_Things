@@ -12,13 +12,15 @@ implementation {
 	components KNoTCryptP;
     components MiniSecC;
     /*ECC encryption components */
-    components NNM, ECCC, ECDSAC;
+    components NNM, ECCC, ECDSAC, ECIESC;
+    components RandomLfsrC;
 
     components new AMSenderC(AM_KNOT_MESSAGE);
     components new AMReceiverC(AM_KNOT_MESSAGE);
-
+    MainC.SoftwareInit -> RandomLfsrC.Init;
     KNoTCrypt = KNoTCryptP;
-    KNoTCryptP.Boot -> MainC;
+    KNoTCryptP.Boot -> MainC.Boot;
+    KNoTCryptP.Random -> RandomLfsrC;
     KNoTCryptP.RadioControl -> ActiveMessageC;
     KNoTCryptP.AMSend -> AMSenderC;
     KNoTCryptP.AMPacket ->AMSenderC;
@@ -27,5 +29,6 @@ implementation {
     KNoTCryptP.MiniSec -> MiniSecC;
     KNoTCryptP.NN -> NNM.NN;
     KNoTCryptP.ECC -> ECCC.ECC;
-    KNoTCryptP.ECDSA -> ECDSAC;
+    KNoTCryptP.ECDSA -> ECDSAC; /* Sign/Verify */
+    KNoTCryptP.ECIES -> ECIESC; /* Encrypt/Decrypt */
 }
