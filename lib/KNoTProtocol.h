@@ -53,11 +53,12 @@
 #define MAC_SIZE            4
 #define E_NONCE_SIZE       45 /* 4(nonce) + 20(KEY_SIZE) + 1 + 20(HMAC) */ 
 
-const char *cmdnames[20] = {"DUMMY0", "QUERY", "QACK","CONNECT", "CACK", 
+const char *cmdnames[23] = {"DUMMY0", "QUERY", "QACK","CONNECT", "CACK", 
                             "RSYN", "RACK", "DISCONNECT", "DACK",
                             "COMMAND", "COMMANDACK", "PING", "PACK", "SEQNO",
                             "SEQACK", "DUMMY1", "RESPONSE", "ASYM_QUERY",
-                            "ASYM_RESPONSE", "ASYM_KEY_TX"};
+                            "ASYM_RESP", "ASYM_RESP_ACK", "DUMMY2", 
+                            "ASYM_KEY_REQ", "ASYM_KEY_TX"};
 typedef nx_struct chan_header {
    nx_uint8_t src_chan_num;
    nx_uint8_t dst_chan_num;
@@ -86,9 +87,9 @@ typedef nx_struct pubKey {
 } PubKey; /* 40bytes */
 
 typedef nx_struct sig {
-   nx_uint16_t r[10];
-   nx_uint16_t s[10];
-} Signature; /* 40bytes */
+   nx_uint16_t r[11];
+   nx_uint16_t s[11];
+} Signature; /* 42bytes */
 
 typedef nx_struct pkc {
    PubKey pubKey;

@@ -70,17 +70,14 @@ implementation {
 	CipherModeContext cc[CHANNEL_NUM + 1];
   AsymState aa[CHANNEL_NUM + 1];
   /* Asymmetric state */
+  ECCState CAState;
+  ECCState eccState;
   Point *publicKey;
   Point *signature;
   Point client_sig;
   NN_DIGIT *privateKey;
   uint8_t ecdsa_state = NO_PUBKEY; /* Which pubkey is in ecdsa */
-  /*Point publicKey = { .x = {0xe5bc, 0x07c6, 0xd567, 0x0f63, 0x39d9, 0x3287, 0x69c2, 0x9c03, 0x1e0e, 0x49b4},
-                      .y = {0x8f83, 0x0e9c, 0x3edc, 0x111c, 0x2a03, 0x6d23, 0x5ed9, 0x6701, 0x08b5, 0x26e0}
-                    };*/
-  Point pkc_signature = { .x = {0xe8ae, 0x6b16, 0xa79d, 0x163b, 0xfccc, 0xb830, 0xd7e4, 0xc5e6, 0x5c10, 0x9fa1},
-                          .y = {0x86a6, 0x5032, 0x4672, 0x89a6, 0xf5a9, 0x31e0, 0x919d, 0x7722, 0x5438, 0x7122}
-                        };
+
   void copy_pkc(AsymQueryPayload *aqp, Point *pubKey, Point *sig){
     memcpy(aqp->pkc.pubKey.x, pubKey->x, 20);
     memcpy(aqp->pkc.pubKey.y, pubKey->y, 20);
@@ -480,13 +477,16 @@ implementation {
 
 	}
 
+/*** ASYMMETRIC CALLS AND HANDLERS ***/
 	command void KNoT.init_asymmetric(uint16_t *priv_key, Point *pub_key, Point *pkc_sig){
     PRINTF("Initing asymmetric...");PRINTFFLUSH();
     publicKey = pub_key;
     privateKey = priv_key;
     signature = pkc_sig;
     call ECC.init();
+    call ECC.saveState(&eccState);
     call ECDSA.init(&CAPublicKey);
+    call ECDSA.saveState(&CAState);
     ecdsa_state = CA_PUBKEY;
     PRINTF("done!\n");PRINTFFLUSH();
   }
@@ -505,13 +505,19 @@ implementation {
   command uint8_t KNoT.asym_pkc_handler(ChanState *state, PDataPayload *pdp){
     /* Verify PKC using CA PubKey */
     uint32_t start_t, end_t;
-    uint8_t pass = 0;
+    uint8_t pass = 0, i = 0;
     AsymQueryPayload *a = (AsymQueryPayload *) &(pdp->dp.data);
     uint8_t *msg = (uint8_t *) &(aa[state->chan_num].pubKey);
     memcpy(aa[state->chan_num].pubKey.x, a->pkc.pubKey.x, 20);
     memcpy(aa[state->chan_num].pubKey.y, a->pkc.pubKey.y, 20);
     memcpy(client_sig.x, a->pkc.sig.r, 20);
     memcpy(client_sig.y, a->pkc.sig.s, 20);
+    for (i = 0; i < 10; i++){
+      PRINTF("%x:%x ", ((uint16_t *) &(aa[state->chan_num].pubKey.x))[i], 
+        ((uint16_t *) &(aa[state->chan_num].pubKey.y))[i]);
+    }PRINTF("\n");PRINTFFLUSH();
+    PRINTF("Chan %d\n", state->chan_num);PRINTFFLUSH();
+    call ECDSA.reinit(&CAState);
     pass = call ECDSA.verify(msg, sizeof(Point), (NN_DIGIT *) (client_sig.x), 
                              (NN_DIGIT *) (client_sig.y), &CAPublicKey);
     PRINTF("PASS: %d\n", pass);PRINTFFLUSH();
@@ -539,29 +545,61 @@ implementation {
   }
 
   command void KNoT.asym_request_key(ChanState *state){
-    uint8_t clen;
-    uint32_t nonce = call Random.rand32();
+    NN_DIGIT r[NUMWORDS];
+    NN_DIGIT s[NUMWORDS];
+    int clen, i, pass;
+    uint32_t nonce = 0;
     PDataPayload *new_pdp = (PDataPayload *) &(state->packet);
     AsymKeyRequestPayload *a = (AsymKeyRequestPayload *) &(new_pdp->dp.data);
+    call ECC.reinit(&eccState);
     clean_packet(new_pdp);
-    PRINTF("Encrypting Nonce..."); PRINTFFLUSH();
-    clen = call ECIES.encrypt((uint8_t*) a->e_nonce, NONCE_CIPHER_LEN, 
+    PRINTF("Chan %d\n", state->chan_num);PRINTFFLUSH();
+    while (nonce == 0) {nonce = call Random.rand32();}
+    PRINTF("Encrypting Nonce %lu...", nonce); PRINTFFLUSH();
+    clen = call ECIES.encrypt((uint8_t *)a->e_nonce, NONCE_CIPHER_LEN, 
                               (uint8_t *) &nonce, M_LEN, 
-                              &(aa[state->chan_num].pubKey));
-    PRINTF("Done.\nSigning Nonce..."); PRINTFFLUSH();
-    call ECDSA.sign((uint8_t *) a->e_nonce, NONCE_CIPHER_LEN, 
-                    (uint16_t *)a->sig.r, (uint16_t *)a->sig.s,
-                    privateKey);
-    PRINTF("Done.\n"); PRINTFFLUSH();
+                               &(aa[state->chan_num].pubKey));
+    PRINTF("Done (%dbytes).\nSigning Nonce...", clen); PRINTFFLUSH();
+    call ECDSA.init(publicKey);
+    call ECDSA.sign((uint8_t *) a->e_nonce, NONCE_CIPHER_LEN, r, s, privateKey);
+    memcpy(a->sig.r, r, NUMWORDS * 2);
+    memcpy(a->sig.s, s, NUMWORDS * 2);
+    PRINTF("done\n");PRINTFFLUSH();
     pdp_complete(new_pdp, state->chan_num, state->remote_chan_num, 
                  ASYM_KEY_REQ, sizeof(AsymKeyRequestPayload));
     send_asym(state->remote_addr, new_pdp);
      /* 5. Send signed + encrypted response with PKC */  
   }
 
-  command void KNoT.asym_key_request_handler(ChanState *state, PDataPayload *pdp){
-    /* Receive a packet containing signed + encrypted response + PKC
-     * 1. Verify PKC with CA PubKey
+  command uint8_t KNoT.asym_key_request_handler(ChanState *state, PDataPayload *pdp){
+    /* Receive a packet containing signed + encrypted response + PKC */
+    NN_DIGIT r[NUMWORDS];
+    NN_DIGIT s[NUMWORDS];
+    uint32_t start_t, end_t;
+    uint32_t nonce;
+    uint8_t mlen = 0, pass = 0, i = 0;
+    AsymKeyRequestPayload *a = (AsymKeyRequestPayload *) &(pdp->dp.data);
+    PRINTF("Chan %d\n", state->chan_num);PRINTFFLUSH();
+    for (i = 0; i < 10; i++){
+      PRINTF("%x:%x ", ((uint16_t *) (publicKey->x[i]))[i], ((uint16_t *)(publicKey->y))[i]);
+    }PRINTF("\n");PRINTFFLUSH();
+    for (i = 0; i < 10; i++){
+      PRINTF("%x:%x ", ((uint16_t *) &(aa[state->chan_num].pubKey.x))[i], 
+        ((uint16_t *) &(aa[state->chan_num].pubKey.y))[i]);
+    }PRINTF("\n");PRINTFFLUSH();
+    call ECDSA.init(publicKey);
+    pass = call ECDSA.verify((uint8_t*) a->e_nonce, NONCE_CIPHER_LEN, 
+                             (uint16_t*) a->sig.r, (uint16_t*) a->sig.s,
+                             &(aa[state->chan_num].pubKey));
+    PRINTF("PASS: %d\n", pass);PRINTFFLUSH();
+    if (pass != 1) return 0;
+    call ECC.init();
+    mlen = call ECIES.decrypt((uint8_t *) &nonce, M_LEN, 
+                              (uint8_t *) a->e_nonce, NONCE_CIPHER_LEN, 
+                              privateKey);
+    PRINTF("Nonce: %lu\n", nonce);PRINTFFLUSH();
+    return nonce;
+     /* 1. Verify PKC with CA PubKey
      * 2. Verify response from sensor 
      * 3. Decrypt response from sensor
      * 4. Record response and nonce

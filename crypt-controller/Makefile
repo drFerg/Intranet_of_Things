@@ -27,7 +27,7 @@ CFLAGS+=-DCURVE_OPT  #optimization for secg curve
 ##ECC
 CFLAGS+=-DPROJECTIVE  #projective coordinate
 CFLAGS+=-DSLIDING_WIN  #sliding window method, windows size is defined in ECC.h
-
+CFLAGS+=-DSHAMIR_TRICK
 CFLAGS += -I$(TOSDIR)/lib/printf 
 CFLAGS += -DTOSH_DATA_LENGTH=120
 CFLAGS += -DDEBUG -DTELOS 

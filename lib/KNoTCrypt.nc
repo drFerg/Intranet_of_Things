@@ -57,7 +57,7 @@ interface KNoTCrypt{
 	command uint8_t asym_pkc_handler(ChanState *state, PDataPayload *pdp);	
 
 	command void asym_request_key(ChanState *state);
-	command void asym_key_request_handler(ChanState *state, PDataPayload *pdp);
+	command uint8_t asym_key_request_handler(ChanState *state, PDataPayload *pdp);
 
 
 	event message_t* receive(uint8_t src, message_t *msg, void *payload, uint8_t len);
