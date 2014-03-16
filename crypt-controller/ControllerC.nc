@@ -39,6 +39,7 @@ module ControllerC @safe()
 implementation
 {
 	ChanState home_chan;
+  uint32_t nonce;
 	bool serialSendBusy = FALSE;
 	uint8_t testKey[] = {0x05,0x15,0x25,0x35,0x45,0x55,0x65,0x75,0x85,0x95};
 	uint8_t testKey_size = 10;
@@ -173,7 +174,7 @@ implementation
         if (!state) return msg;
         state->remote_chan_num = pdp->ch.src_chan_num;
         PRINTF("Generating Nonce and sending...\n");PRINTFFLUSH();
-        call KNoT.asym_request_key(state);
+        nonce = call KNoT.asym_request_key(state);
         set_state(state, STATE_ASYM_REQ_KEY);
       }
       else if (pdp->dp.hdr.cmd == ASYM_KEY_REQ){
@@ -181,9 +182,12 @@ implementation
         state = call ChannelTable.get_channel_state(pdp->ch.dst_chan_num);
         if (!state) return msg;
         call KNoT.asym_key_request_handler(state, pdp);
+        call KNoT.asym_key_resp(state, nonce, testKey);
       }
-      else if (pdp->dp.hdr.cmd == ASYM_KEY_TX){
-        PRINTF("Received key TX\n");
+      else if (pdp->dp.hdr.cmd == ASYM_KEY_RESP){
+        PRINTF("Received key TX %d\n", len);
+        state = call ChannelTable.get_channel_state(pdp->ch.dst_chan_num);
+        call KNoT.asym_key_resp_handler(state, pdp, nonce);
       }
       PRINTF("returning...\n"); PRINTFFLUSH();
       return msg;

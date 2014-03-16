@@ -35,9 +35,10 @@
 #define CA_PUBKEY 1
 #define MY_PUBKEY 2
 
-#define M_LEN 4
+#define NONCE_LEN 4
                          /* 4(nonce) + 20(KEY_SIZE) + 1 + 20(HMAC) */ 
-#define NONCE_CIPHER_LEN M_LEN + KEYDIGITS * NN_DIGIT_LEN + 1  + HMAC_LEN
+#define NONCE_CIPHER_LEN NONCE_LEN + KEYDIGITS * NN_DIGIT_LEN + 1  + HMAC_LEN
+#define KEY_NONCE_CIPHER_LEN SYM_KEY_SIZE + NONCE_CIPHER_LEN
 
 typedef struct asym_state {
   Point pubKey;
@@ -152,7 +153,6 @@ implementation {
 		PRINTF("SEC>> Flags: %d\n", sp->flags);
 		PRINTF("SEC>> IV: %d\n", (sp->flags & (0xff >> 2)));
     PRINTF("SEC>> Size of encrypted payload: %d\n", payload_len);
-		//memcpy(payload, sp, len);
 		if (call AMSend.send(dest, &am_pkt, pkt_len) == SUCCESS) {
 			sendBusy = TRUE;
 			PRINTF("RADIO>> Sent a packet to Thing %d\n", dest);		
@@ -166,10 +166,16 @@ implementation {
 	}
 
   void send_asym(int dest, PDataPayload *pdp){
+  	uint8_t i;
     uint8_t len = FLAG_SIZE + sizeof(ChanHeader) + sizeof(PayloadHeader) + sizeof(DataHeader) + pdp->dp.dhdr.tlen;
     Packet *payload = (Packet *) (call AMSend.getPayload(&am_pkt, len));
     payload->flags = 0;
     payload->flags |= ASYMMETRIC_MASK; /* Set asymmetric flag */
+    if (len > MAX_PACKET_SIZE) {
+    	PRINTF("ERROR>> PACKET TOO BIG TO SEND\n");
+    	PRINTFFLUSH();
+    	return;
+    }
     memcpy(&(payload->ch), pdp, len);
     PRINTF("len: %d:%d\n", len, pdp->dp.dhdr.tlen);PRINTFFLUSH();
     if (call AMSend.send(dest, &am_pkt, len) == SUCCESS) {
@@ -211,10 +217,10 @@ implementation {
 
   command void KNoT.receiveDecrypt(ChanState *state, SSecPacket *sp, uint8_t len, uint8_t *valid){
     uint8_t cipher_len = len - sizeof(ChanHeader) - MAC_SIZE - FLAG_SIZE;
-    PRINTF("Size of encrypted payload: %d\n", cipher_len);
+    PRINTF("SYM>> Size of encrypted payload: %d\n", cipher_len);
     call MiniSec.decrypt(&cc[state->chan_num], sp->flags, (uint8_t *)&(sp->dp), 
                          cipher_len, (uint8_t *)&(sp->dp), (uint8_t *)&(sp->sh.tag), valid);
-    PRINTF("Valid MAC: %s\n", (*valid?"yes":"no"));PRINTFFLUSH();
+    PRINTF("SYM>> Valid MAC: %s\n", (*valid?"yes":"no"));PRINTFFLUSH();
   }
 
 /* Higher level calls */
@@ -479,7 +485,7 @@ implementation {
 
 /*** ASYMMETRIC CALLS AND HANDLERS ***/
 	command void KNoT.init_asymmetric(uint16_t *priv_key, Point *pub_key, Point *pkc_sig){
-    PRINTF("Initing asymmetric...");PRINTFFLUSH();
+    PRINTF("ECC>> Initialising...");PRINTFFLUSH();
     publicKey = pub_key;
     privateKey = priv_key;
     signature = pkc_sig;
@@ -512,15 +518,11 @@ implementation {
     memcpy(aa[state->chan_num].pubKey.y, a->pkc.pubKey.y, 20);
     memcpy(client_sig.x, a->pkc.sig.r, 20);
     memcpy(client_sig.y, a->pkc.sig.s, 20);
-    for (i = 0; i < 10; i++){
-      PRINTF("%x:%x ", ((uint16_t *) &(aa[state->chan_num].pubKey.x))[i], 
-        ((uint16_t *) &(aa[state->chan_num].pubKey.y))[i]);
-    }PRINTF("\n");PRINTFFLUSH();
     PRINTF("Chan %d\n", state->chan_num);PRINTFFLUSH();
     call ECDSA.reinit(&CAState);
     pass = call ECDSA.verify(msg, sizeof(Point), (NN_DIGIT *) (client_sig.x), 
                              (NN_DIGIT *) (client_sig.y), &CAPublicKey);
-    PRINTF("PASS: %d\n", pass);PRINTFFLUSH();
+  	PRINTF("ECC>> Certificate verification - %s(%d)\n", (pass == 1 ? "PASSED":"FAILED"), pass);
     return pass;
   }
 
@@ -544,69 +546,106 @@ implementation {
     send_asym(state->remote_addr, new_pdp);
   }
 
-  command void KNoT.asym_request_key(ChanState *state){
+  command uint32_t KNoT.asym_request_key(ChanState *state){
     NN_DIGIT r[NUMWORDS];
     NN_DIGIT s[NUMWORDS];
-    int clen, i, pass;
+    int clen, pass;
     uint32_t nonce = 0;
     PDataPayload *new_pdp = (PDataPayload *) &(state->packet);
     AsymKeyRequestPayload *a = (AsymKeyRequestPayload *) &(new_pdp->dp.data);
     call ECC.reinit(&eccState);
     clean_packet(new_pdp);
-    PRINTF("Chan %d\n", state->chan_num);PRINTFFLUSH();
     while (nonce == 0) {nonce = call Random.rand32();}
-    PRINTF("Encrypting Nonce %lu...", nonce); PRINTFFLUSH();
+    PRINTF("ECC>> Encrypting Nonce %lu...", nonce); PRINTFFLUSH();
     clen = call ECIES.encrypt((uint8_t *)a->e_nonce, NONCE_CIPHER_LEN, 
-                              (uint8_t *) &nonce, M_LEN, 
+                              (uint8_t *) &nonce, NONCE_LEN, 
                                &(aa[state->chan_num].pubKey));
-    PRINTF("Done (%dbytes).\nSigning Nonce...", clen); PRINTFFLUSH();
+    PRINTF("Done (%dbytes).\nECC>> Signing Nonce...", clen); PRINTFFLUSH();
     call ECDSA.init(publicKey);
     call ECDSA.sign((uint8_t *) a->e_nonce, NONCE_CIPHER_LEN, r, s, privateKey);
-    memcpy(a->sig.r, r, NUMWORDS * 2);
-    memcpy(a->sig.s, s, NUMWORDS * 2);
+    memcpy(a->sig.r, r, NUMWORDS * NN_DIGIT_LEN);
+    memcpy(a->sig.s, s, NUMWORDS * NN_DIGIT_LEN);
     PRINTF("done\n");PRINTFFLUSH();
     pdp_complete(new_pdp, state->chan_num, state->remote_chan_num, 
                  ASYM_KEY_REQ, sizeof(AsymKeyRequestPayload));
     send_asym(state->remote_addr, new_pdp);
-     /* 5. Send signed + encrypted response with PKC */  
+     /* 5. Send signed + encrypted response with PKC */ 
+		return nonce; 
   }
 
-  command uint8_t KNoT.asym_key_request_handler(ChanState *state, PDataPayload *pdp){
+  command uint32_t KNoT.asym_key_request_handler(ChanState *state, PDataPayload *pdp){
     /* Receive a packet containing signed + encrypted response + PKC */
-    NN_DIGIT r[NUMWORDS];
-    NN_DIGIT s[NUMWORDS];
     uint32_t start_t, end_t;
     uint32_t nonce;
-    uint8_t mlen = 0, pass = 0, i = 0;
+    uint8_t mlen = 0, pass = 0;
     AsymKeyRequestPayload *a = (AsymKeyRequestPayload *) &(pdp->dp.data);
-    PRINTF("Chan %d\n", state->chan_num);PRINTFFLUSH();
-    for (i = 0; i < 10; i++){
-      PRINTF("%x:%x ", ((uint16_t *) (publicKey->x[i]))[i], ((uint16_t *)(publicKey->y))[i]);
-    }PRINTF("\n");PRINTFFLUSH();
-    for (i = 0; i < 10; i++){
-      PRINTF("%x:%x ", ((uint16_t *) &(aa[state->chan_num].pubKey.x))[i], 
-        ((uint16_t *) &(aa[state->chan_num].pubKey.y))[i]);
-    }PRINTF("\n");PRINTFFLUSH();
-    call ECDSA.init(publicKey);
-    pass = call ECDSA.verify((uint8_t*) a->e_nonce, NONCE_CIPHER_LEN, 
-                             (uint16_t*) a->sig.r, (uint16_t*) a->sig.s,
+    call ECDSA.init(&(aa[state->chan_num].pubKey));
+    pass = call ECDSA.verify((uint8_t *) a->e_nonce, NONCE_CIPHER_LEN, 
+                             (uint16_t *) a->sig.r, (uint16_t *) a->sig.s,
                              &(aa[state->chan_num].pubKey));
-    PRINTF("PASS: %d\n", pass);PRINTFFLUSH();
+    PRINTF("ECC>> Signature verification - %s(%d)\n", (pass == 1 ? "PASSED":"FAILED"), pass);
+    PRINTFFLUSH();
     if (pass != 1) return 0;
     call ECC.init();
-    mlen = call ECIES.decrypt((uint8_t *) &nonce, M_LEN, 
+    mlen = call ECIES.decrypt((uint8_t *) &nonce, NONCE_LEN, 
                               (uint8_t *) a->e_nonce, NONCE_CIPHER_LEN, 
                               privateKey);
+    PRINTF("ECC>> Decryption - %s(%d)\n", (mlen > 0 ? "SUCCEEDED":"FAILED"), mlen);
     PRINTF("Nonce: %lu\n", nonce);PRINTFFLUSH();
     return nonce;
-     /* 1. Verify PKC with CA PubKey
-     * 2. Verify response from sensor 
-     * 3. Decrypt response from sensor
-     * 4. Record response and nonce
-     * 5. Encrypt nonce + SymKey
-     * 6. Sign encrypted nonce + SymKey
-     * 7. Send signed + encrypted nonce + SymKey
-     */
+  }
+
+  command void KNoT.asym_key_resp(ChanState *state, uint32_t nonce, uint8_t *symKey){
+    NN_DIGIT r[NUMWORDS];
+    NN_DIGIT s[NUMWORDS];
+  	uint8_t clen = 0, pass = 0, i = 0;
+  	PDataPayload *new_pdp = (PDataPayload *) &(state->packet);
+    AsymKeyRespPayload *a = (AsymKeyRespPayload *) &(new_pdp->dp.data);
+    AsymKeyPayload k = {.nonce = nonce};
+    memcpy(&(k.sKey), symKey, SYM_KEY_SIZE);
+    call ECC.reinit(&eccState);
+    clean_packet(new_pdp);
+    PRINTF("ECC>> Encrypting key + nonce..."); PRINTFFLUSH();
+    clen = call ECIES.encrypt((uint8_t *) a->e_payload, KEY_NONCE_CIPHER_LEN, 
+                              (uint8_t *) &k, SYM_KEY_SIZE + NONCE_LEN, 
+                               &(aa[state->chan_num].pubKey));
+    PRINTF("CLen: %d\n", clen);
+    PRINTF("Done (%dbytes).\nECC>> Signing key + nonce...", clen); PRINTFFLUSH();
+    call ECDSA.init(publicKey);
+    call ECDSA.sign((uint8_t *) a->e_payload, KEY_NONCE_CIPHER_LEN, r, s, privateKey);
+    memcpy(a->sig.r, r, NUMWORDS * NN_DIGIT_LEN);
+    memcpy(a->sig.s, s, NUMWORDS * NN_DIGIT_LEN);
+    PRINTF("done\n");PRINTFFLUSH();
+    pdp_complete(new_pdp, state->chan_num, state->remote_chan_num, 
+                 ASYM_KEY_RESP, sizeof(AsymKeyRespPayload));
+    send_asym(state->remote_addr, new_pdp);
+  }
+
+  command uint8_t KNoT.asym_key_resp_handler(ChanState *state, PDataPayload *pdp, uint32_t nonce){
+		uint32_t start_t, end_t;
+    int8_t mlen = 0;
+    uint8_t pass = 0, i = 0;
+    AsymKeyPayload k;
+    AsymKeyRespPayload *a = (AsymKeyRespPayload *) &(pdp->dp.data);
+    for (i = 0; i < 11; i++){
+    	PRINTF("%x:%x ",a->sig.r[i], a->sig.s[i]);
+    }PRINTF("\n");PRINTFFLUSH();
+    call ECDSA.init(&(aa[state->chan_num].pubKey));
+    pass = call ECDSA.verify((uint8_t *) a->e_payload, KEY_NONCE_CIPHER_LEN, 
+                             (uint16_t *) a->sig.r, (uint16_t *) a->sig.s,
+                             &(aa[state->chan_num].pubKey));
+    PRINTF("ECC>> Signature verification - %s(%d)\n", (pass == 1 ? "PASSED":"FAILED"), pass);
+    PRINTFFLUSH();
+    if (pass != 1) return 0;
+    call ECC.init();
+    mlen = call ECIES.decrypt((uint8_t *) &k, SYM_KEY_SIZE + NONCE_LEN, 
+                              (uint8_t *) a->e_payload, KEY_NONCE_CIPHER_LEN, 
+                              privateKey);
+    PRINTF("ECC>> Decryption - %s(%d)\n", (mlen > 0 ? "SUCCEEDED":"FAILED"), mlen);
+    PRINTF("Nonce: %lu\n", k.nonce);PRINTFFLUSH();
+    if (nonce != k.nonce) return 0;
+    memcpy(state->key, k.sKey, SYM_KEY_SIZE);
+    return 1;
   }
 
 /*--------------------------- EVENTS ------------------------------------------------*/

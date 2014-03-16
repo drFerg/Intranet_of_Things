@@ -35,7 +35,7 @@
 #define ASYM_RESPONSE 18
 #define ASYM_RESP_ACK 19
 #define ASYM_KEY_REQ  21
-#define ASYM_KEY_TX 22
+#define ASYM_KEY_RESP 22
 
 
 #define CMD_LOW QUERY
@@ -43,22 +43,22 @@
 
 /* =======================*/
 
-/* Macro signifying payload of 0 length */
-#define MAX_PACKET_SIZE    90
+#define MAX_PACKET_SIZE    110
 #define NO_PAYLOAD          0
-#define MAX_DATA_SIZE      84
+#define MAX_DATA_SIZE      100
 #define RESPONSE_DATA_SIZE 16
+#define SYM_KEY_SIZE       10
 #define ASYM_SIZE          84
 #define NAME_SIZE          16
 #define MAC_SIZE            4
 #define E_NONCE_SIZE       45 /* 4(nonce) + 20(KEY_SIZE) + 1 + 20(HMAC) */ 
-
+#define E_KEY_SIZE         55 /* 4(nonce) + 10(SYM_KEY_SIZE)+ 20(KEY_SIZE) + 1 + 20(HMAC) */
 const char *cmdnames[23] = {"DUMMY0", "QUERY", "QACK","CONNECT", "CACK", 
                             "RSYN", "RACK", "DISCONNECT", "DACK",
                             "COMMAND", "COMMANDACK", "PING", "PACK", "SEQNO",
                             "SEQACK", "DUMMY1", "RESPONSE", "ASYM_QUERY",
                             "ASYM_RESP", "ASYM_RESP_ACK", "DUMMY2", 
-                            "ASYM_KEY_REQ", "ASYM_KEY_TX"};
+                            "ASYM_KEY_REQ", "ASYM_KEY_RESP"};
 typedef nx_struct chan_header {
    nx_uint8_t src_chan_num;
    nx_uint8_t dst_chan_num;
@@ -105,15 +105,20 @@ typedef nx_struct asym_resp_ack_payload {
    nx_uint8_t flags;
 } AsymRespACKPayload; /* 81bytes */
 
-typedef nx_struct asym_response_payload {
+typedef nx_struct asym_request_payload {
    nx_uint8_t e_nonce[E_NONCE_SIZE];
    Signature sig;
 } AsymKeyRequestPayload; /* 85bytes */
 
+typedef struct asym_key_payload {
+   uint32_t nonce;
+   nx_uint8_t sKey[10];
+} AsymKeyPayload;
+
 typedef nx_struct asym_key_tx_payload {
-   nx_uint16_t nonce;
-   nx_uint8_t sym_key[10];
-} AsymKeyTxPayload;
+   nx_uint8_t e_payload[E_KEY_SIZE];
+   Signature sig;
+} AsymKeyRespPayload;
 
 /********************/
 /* Symmetric Packet */

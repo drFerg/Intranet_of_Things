@@ -32,8 +32,9 @@ CFLAGS += -I$(TOSDIR)/lib/printf
 CFLAGS += -DTOSH_DATA_LENGTH=120
 CFLAGS += -DDEBUG -DTELOS 
 CFLAGS += -DDEVICE_NAME=\"TEST\" -I../lib -DCHANNEL_NUM=5
-CFLAGS += -I../../TinyECC-2.0
-CFLAGS += -DPRINTF_BUFFER_SIZE=500
+CFLAGS += -I../../TinyECC
+CFLAGS += -DPRINTF_BUFFER_SIZE=500 -DNEW_PRINTF_SEMANTICS
+CFLAGS += -W -Wall -Wno-unused-parameter -Wno-unused-variable -Wno-override-init
 #CFLAGS += -DSIM
 COMPONENT=ControllerAppC
 
