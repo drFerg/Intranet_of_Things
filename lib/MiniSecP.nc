@@ -58,13 +58,9 @@ implementation {
   
   void test(CipherModeContext *cc){
     uint8_t valid = 0;
-    //Sec.encrypt(plainMsg, 40, tag, 8, iv);
-    PRINTF("Plaintext block 0: %x\n", plainMsg[0]);
     call CipherMode.encrypt(cc, plainMsg, cipherMsg, 40, testTag);
-    PRINTF("Encrypted block 0: %x\n", cipherMsg[0]);PRINTFFLUSH();
     call CipherMode.decrypt(cc, cipherMsg, decryptedMsg, 40, testTag, &valid);
-    PRINTF("Plaintext block 0: %x\n", decryptedMsg[0]);
-    PRINTF("Valid MAC: %s\n", (valid?"yes":"no"));PRINTFFLUSH();
+    PRINTF("INIT SUCCESSFUL: %s\n", (valid?"YES":"NO"));PRINTFFLUSH();
   }
 
   command error_t Sec.init(CipherModeContext *cc, uint8_t *key, uint8_t key_size,
@@ -84,12 +80,10 @@ implementation {
   command error_t Sec.encrypt(CipherModeContext *cc, uint8_t *plain_blocks, uint8_t length, 
                               uint8_t *cipher_blocks, uint8_t *tag) {
     PRINTF("len: %d\n", length);
-    PRINTF("IV = %d\n", cc->iv[7]);
+    PRINTF("IV was = %d\n", cc->iv[7]);
     if(incrementIV(cc->iv)) {PRINTF("OH NOES\n");return FAIL;}
-    PRINTF("IV = %d\n", cc->iv[7]);
+    PRINTF("IV now = %d\n", cc->iv[7]);
     call CipherMode.encrypt(cc, plain_blocks, cipher_blocks, length, tag);
-    //memcpy(data, cipherMsg, length);
-    PRINTF("cipher_tag_len: %d\n", length + TAG_LEN);
     return length + TAG_LEN;
   }
 
@@ -98,17 +92,16 @@ implementation {
     uint8_t attempts_left = 63;
     while (attempts_left-- && ((cc->iv[7] & LNB_MASK(IV_BITS)) != (iv & LNB_MASK(IV_BITS)))){
       incrementIV(cc->iv);
-      PRINTF("+1\n");
     }
     if (attempts_left == 0) return FAIL;
-    PRINTF("IV = %d\n", cc->iv[7]);
+    PRINTF("IV now = %d\n", cc->iv[7]);
     call CipherMode.decrypt(cc, cipher_blocks, plain_blocks,
                               length, tag, valid);
     return *valid;
   }
 
   error_t incrementIV(uint8_t *iv_block) {
-    int i;
+    uint8_t i;
     for (i = 7; i >= 0; i--) {
       iv_block[i]++;
       if (iv_block[i]) return SUCCESS;

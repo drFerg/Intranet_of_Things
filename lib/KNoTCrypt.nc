@@ -46,7 +46,7 @@ interface KNoTCrypt{
 	command void disconnect_handler(ChanState *state, PDataPayload *pdp);
 
 	command void init_symmetric(ChanState *state, uint8_t *key, uint8_t key_size);
-  command void receiveDecrypt(ChanState *state, SSecPacket *sp, uint8_t len, uint8_t *valid);
+	command void receiveDecrypt(ChanState *state, SSecPacket *sp, uint8_t len, uint8_t *valid);
 	
 	command void init_asymmetric(uint16_t *priv_key, Point *pub_key, Point *pkc_sig);
 	
@@ -59,6 +59,9 @@ interface KNoTCrypt{
 	command uint32_t asym_request_key(ChanState *state);
 	command uint32_t asym_key_request_handler(ChanState *state, PDataPayload *pdp);
 	command void asym_key_resp(ChanState *state, uint32_t nonce, uint8_t *symKey);
-  command uint8_t asym_key_resp_handler(ChanState *state, PDataPayload *pdp, uint32_t nonce);
-	event message_t* receive(uint8_t src, message_t *msg, void *payload, uint8_t len);
+	command uint8_t asym_key_resp_handler(ChanState *state, PDataPayload *pdp, uint32_t nonce);
+  
+  command void sym_handover(ChanState *state);
+  command void sym_handover_handler(ChanState *state, PDataPayload *pdp);
+  event message_t* receive(uint8_t src, message_t *msg, void *payload, uint8_t len);
 }

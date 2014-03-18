@@ -49,7 +49,7 @@ implementation
   Point pkc_signature = { .x = {0x6df6, 0x675b, 0x44d9, 0x3e11, 0xd26c, 0xb723, 0x5b14, 0x3b7d, 0x8fc1, 0xcfcc},
                           .y = {0x9ffb, 0xcba4, 0xf71c, 0xfed3, 0xbdda, 0xcca6, 0x15f0, 0x4f2e, 0xe17f, 0x69ad}
                         };
-  uint16_t privateKey[11] = {0xbf3d, 0x27bd, 0x26a3, 0xa2d7, 0x1225, 0x2cc1, 0x7899, 0xd02d, 0x914c, 0x1382};
+  uint16_t privateKey[11] = {0xbf3d, 0x27bd, 0x26a3, 0xa2d7, 0x1225, 0x2cc1, 0x7899, 0xd02d, 0x914c, 0x1382, 0x0000};
   /* Checks the timer for a channel's state, retransmitting when necessary */
 	void check_timer(ChanState *state) {
     decrement_ticks(state);
@@ -84,18 +84,31 @@ implementation
 	}
 
 
-  ChanState * pkc_verification(PDataPayload *pdp, uint8_t src){
+  ChanState *pkc_verification(PDataPayload *pdp, uint8_t src){
     /*Assume most certificates will be good */
     ChanState *state = call ChannelTable.new_channel(); 
     if (call KNoT.asym_pkc_handler(state, pdp) != VALID_PKC) {
       call ChannelTable.remove_channel(state->chan_num);
       return 0;
     }
-    PRINTF("Verified\n");PRINTFFLUSH();
     state->remote_addr = src;
     state->remote_chan_num = pdp->ch.src_chan_num;
     state->seqno = pdp->dp.hdr.seqno;
     return state;
+  }
+
+  ChanState *retrieve_state(int chan, ChanHeader *ch, PDataPayload *pdp, int src){
+    ChanState *s = call ChannelTable.get_channel_state(chan);
+    if (!s){ /* Attempt to kill connection if no state held */
+      PRINTF("Channel %d doesn't exist\n", chan);
+      s = &home_chan;
+      s->remote_chan_num = ch->src_chan_num;
+      s->remote_addr = src;
+      s->seqno = pdp->dp.hdr.seqno;
+      call KNoT.close_graceful(s);
+      return NULL;
+    } 
+    else return s;
   }
       
 	/*------------------------------------------------- */
@@ -107,7 +120,7 @@ implementation
     call ChannelTable.init_table();
     call ChannelState.init_state(&home_chan, 0);
     call CleanerTimer.startPeriodic(TICK_RATE);
-    call KNoT.init_symmetric(&home_chan, testKey, testKey_size);
+    //call KNoT.init_symmetric(&home_chan, testKey, testKey_size);
     call KNoT.init_asymmetric(privateKey, &publicKey, &pkc_signature);
     }
     
@@ -128,29 +141,18 @@ implementation
     call LEDBlink.report_received();
 	  PRINTF("SEC>> Received %s packet\n", is_symmetric(p->flags)?"Symmetric":
     			                               is_asymmetric(p->flags)?"Asymmetric":"Plain");
-
+    /* SYMMETRIC RECEIVE AND DECRYPT */
   	if (is_symmetric(p->flags)) {
+      sp = (SSecPacket *) p;
       PRINTF("SEC>> IV: %d\n", sp->flags & (0xff >> 2));PRINTFFLUSH();
-  		sp = (SSecPacket *) p;
-      if (sp->ch.dst_chan_num) { /* Get CC for channel */ 
-        state = call ChannelTable.get_channel_state(sp->ch.dst_chan_num);
-        if (!state){ /* If bogus request kill bogie */
-          PRINTF("Channel %d doesn't exist\n", ch->dst_chan_num);
-          state = &home_chan;
-          state->remote_chan_num = ch->src_chan_num;
-          state->remote_addr = src;
-          state->seqno = pdp->dp.hdr.seqno;
-          call KNoT.close_graceful(state);
-          return msg;
-        }
+      if (sp->ch.dst_chan_num) { /* Get state for channel */ 
+        state = retrieve_state(sp->ch.dst_chan_num, &(sp->ch), pdp, src);
+        if (!state) return msg;
       }
-      else state = &home_chan;
-
   		call KNoT.receiveDecrypt(state, sp, len, &valid);
       if (!valid) return msg; /* Return if decryption failed */
-
   		pdp = (PDataPayload *) (&sp->ch); /* Offsetting to start of pdp */
-  	} 
+  	} /* ASYMMETRIC RECIEVE, DECRYPT AND PROCESS */
     else if (is_asymmetric(p->flags)) {
       if (!isAsymActive()) return msg; /* Don't waste time/energy */
       pdp = (PDataPayload *) &(p->ch);
@@ -181,19 +183,27 @@ implementation
         PRINTF("Received key request %d\n", pdp->ch.dst_chan_num);PRINTFFLUSH();
         state = call ChannelTable.get_channel_state(pdp->ch.dst_chan_num);
         if (!state) return msg;
-        call KNoT.asym_key_request_handler(state, pdp);
+        nonce = call KNoT.asym_key_request_handler(state, pdp);
         call KNoT.asym_key_resp(state, nonce, testKey);
+        call KNoT.init_symmetric(state, state->key, SYM_KEY_SIZE);
       }
       else if (pdp->dp.hdr.cmd == ASYM_KEY_RESP){
         PRINTF("Received key TX %d\n", len);
         state = call ChannelTable.get_channel_state(pdp->ch.dst_chan_num);
-        call KNoT.asym_key_resp_handler(state, pdp, nonce);
+        if (call KNoT.asym_key_resp_handler(state, pdp, nonce)) {
+          call KNoT.init_symmetric(state, state->key, SYM_KEY_SIZE);
+          call KNoT.sym_handover(state);
+        }
       }
       PRINTF("returning...\n"); PRINTFFLUSH();
       return msg;
+    } /* PLAIN PACKET */
+    else {
+      pdp = (PDataPayload *) &(p->ch);
+      /* Grab state for requested channel */
+      state = retrieve_state(sp->ch.dst_chan_num, &(pdp->ch), pdp, src);
+      if (!state) return msg;
     }
-    else pdp = (PDataPayload *) &(p->ch);
-
     ch = &(pdp->ch);
   	cmd = pdp->dp.hdr.cmd;
   	PRINTF("CON>> Received packet from Thing: %d\n", src);
@@ -206,18 +216,12 @@ implementation
       case(CONNECT): return msg;
       case(QACK): call KNoT.qack_handler(&home_chan, pdp, src); return msg;
       case(DACK): return msg;
+      case(SYM_HANDOVER): 
+        call KNoT.sym_handover_handler(state, pdp);
+        call KNoT.connect(state, state->remote_addr, 5);
+        return msg;
   	}
-    /* Grab state for requested channel */
-  	state = call ChannelTable.get_channel_state(ch->dst_chan_num);
-  	if (!state){ /* Attempt to kill connection if no state held */
-  		PRINTF("Channel %d doesn't exist\n", ch->dst_chan_num);
-  		state = &home_chan;
-  		state->remote_chan_num = ch->src_chan_num;
-  		state->remote_addr = src;
-  		state->seqno = pdp->dp.hdr.seqno;
-  		call KNoT.close_graceful(state);
-  		return msg;
-  	} else if (!call KNoT.valid_seqno(state, pdp)) {
+    if (!call KNoT.valid_seqno(state, pdp)) {
   		PRINTF("Old packet\n");
   		return msg;
   	}
@@ -239,6 +243,7 @@ implementation
     
 	event message_t *SerialReceive.receive(message_t *msg, void* payload, uint8_t len){
   	PDataPayload *pdp = (PDataPayload *)payload;
+    ChanState *s;
   	void * data = &(pdp->dp.data);
   	uint8_t cmd = pdp->dp.hdr.cmd;
   	call LEDBlink.report_received();
@@ -252,9 +257,10 @@ implementation
 		switch (cmd) {
 			case(QUERY): call KNoT.send_asym_query(&home_chan);break;
       //case(QUERY): call KNoT.query(&home_chan, 1/*((QueryMsg*)dp)->type*/);break;
-			case(CONNECT): call KNoT.connect(call ChannelTable.new_channel(), 
-													             ((SerialConnect*)data)->addr, 
-													             ((SerialConnect*)data)->rate);break;
+			case(CONNECT): 
+        s = call ChannelTable.get_channel_state(pdp->ch.src_chan_num);
+        call KNoT.connect(s, s->remote_addr, ((SerialConnect*)data)->rate);
+        break;
 		}
 		call LEDBlink.report_received();
   	return msg;

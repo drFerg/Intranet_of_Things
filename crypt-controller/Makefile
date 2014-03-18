@@ -31,8 +31,8 @@ CFLAGS+=-DSHAMIR_TRICK
 CFLAGS += -I$(TOSDIR)/lib/printf 
 CFLAGS += -DTOSH_DATA_LENGTH=120
 CFLAGS += -DDEBUG -DTELOS 
-CFLAGS += -DDEVICE_NAME=\"TEST\" -I../lib -DCHANNEL_NUM=5
-CFLAGS += -I../../TinyECC
+CFLAGS += -DDEVICE_NAME=\"TEST\" -DCHANNEL_NUM=5
+CFLAGS += -I../../TinyECC -I../lib 
 CFLAGS += -DPRINTF_BUFFER_SIZE=500 -DNEW_PRINTF_SEMANTICS
 CFLAGS += -W -Wall -Wno-unused-parameter -Wno-unused-variable -Wno-override-init
 #CFLAGS += -DSIM

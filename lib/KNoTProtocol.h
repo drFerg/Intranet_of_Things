@@ -6,8 +6,7 @@
 */ 
 #ifndef KNOT_PROTOCOL_H
 #define KNOT_PROTOCOL_H
-#include <stdint.h>
-
+ 
 //Sensor type
 #define TEMP   1
 #define HUM    2
@@ -36,10 +35,10 @@
 #define ASYM_RESP_ACK 19
 #define ASYM_KEY_REQ  21
 #define ASYM_KEY_RESP 22
-
+#define SYM_HANDOVER  23
 
 #define CMD_LOW QUERY
-#define CMD_HIGH RESPONSE		/* change this if commands added */
+#define CMD_HIGH KEYACK		/* change this if commands added */
 
 /* =======================*/
 
@@ -53,12 +52,12 @@
 #define MAC_SIZE            4
 #define E_NONCE_SIZE       45 /* 4(nonce) + 20(KEY_SIZE) + 1 + 20(HMAC) */ 
 #define E_KEY_SIZE         55 /* 4(nonce) + 10(SYM_KEY_SIZE)+ 20(KEY_SIZE) + 1 + 20(HMAC) */
-const char *cmdnames[23] = {"DUMMY0", "QUERY", "QACK","CONNECT", "CACK", 
+const char *cmdnames[24] = {"DUMMY0", "QUERY", "QACK","CONNECT", "CACK", 
                             "RSYN", "RACK", "DISCONNECT", "DACK",
                             "COMMAND", "COMMANDACK", "PING", "PACK", "SEQNO",
                             "SEQACK", "DUMMY1", "RESPONSE", "ASYM_QUERY",
                             "ASYM_RESP", "ASYM_RESP_ACK", "DUMMY2", 
-                            "ASYM_KEY_REQ", "ASYM_KEY_RESP"};
+                            "ASYM_KEY_REQ", "ASYM_KEY_RESP", "KEY_HANDOVER"};
 typedef nx_struct chan_header {
    nx_uint8_t src_chan_num;
    nx_uint8_t dst_chan_num;

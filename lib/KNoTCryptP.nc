@@ -86,14 +86,6 @@ implementation {
     memcpy(aqp->pkc.sig.s, sig->y, 20);
   }
 
-
-  void dp_complete(DataPayload *dp, uint8_t src, uint8_t dst, 
-               uint8_t cmd, uint8_t len){
-    //dp->hdr.src_chan_num = src; 
-    //dp->hdr.dst_chan_num = dst; 
-    dp->hdr.cmd = cmd; 
-    dp->dhdr.tlen = len;
-  }
   void pdp_complete(PDataPayload *pdp, uint8_t src, uint8_t dst, 
                uint8_t cmd, uint8_t len){
     pdp->ch.src_chan_num = src; 
@@ -127,18 +119,18 @@ implementation {
     PRINTF("len: %d:%d\n", len, pdp->dp.dhdr.tlen);PRINTFFLUSH();
 		if (call AMSend.send(dest, &am_pkt, len) == SUCCESS) {
 			sendBusy = TRUE;
-			PRINTF("RADIO>> Sent a %s packet to Thing %d\n", cmdnames[payload->dp.hdr.cmd], dest);		
-			PRINTF("RADIO>> KNoT Payload Length: %d\n", payload->dp.dhdr.tlen);
+			PRINTF("RADIO>> Sent a %s packet to Thing %d, len: %d\n", 
+             cmdnames[payload->dp.hdr.cmd], dest,payload->dp.dhdr.tlen);
 		}
 		else {
-			PRINTF("ID: %d, Radio Msg could not be sent, channel busy\n", TOS_NODE_ID);
+			PRINTF("ID: %d, SEND FAILED\n", TOS_NODE_ID);
 			call LEDBlink.report_problem();
 		}
 		PRINTFFLUSH();
 	}
 
 	void send_encrypted(int dest, uint8_t chan, PDataPayload *pdp){
-    int i;
+    uint8_t cmd = pdp->dp.hdr.cmd;
     uint8_t payload_len = sizeof(PayloadHeader) + sizeof(DataHeader) + pdp->dp.dhdr.tlen;
     uint8_t pkt_len = FLAG_SIZE + MAC_SIZE + sizeof(ChanHeader) + payload_len; 
 		SSecPacket *sp = (SSecPacket *) (call AMSend.getPayload(&am_pkt, pkt_len));
@@ -146,20 +138,18 @@ implementation {
 		call MiniSec.encrypt(&cc[chan], (uint8_t*) &(pdp->dp), payload_len, 
                          (uint8_t*) &(sp->dp), (uint8_t*) &(sp->sh.tag));
     memcpy(&(sp->ch), &(pdp->ch), sizeof(ChanHeader));
-    PRINTF("len_to_send: %d\n", pkt_len);
 		sp->flags = 0;
 		sp->flags |= SYMMETRIC_MASK; /* Set symmetric flag */
 		sp->flags |= (cc[chan].iv[7] & (0xff >> 2)); /* OR lower 6 bits of IV */
-		PRINTF("SEC>> Flags: %d\n", sp->flags);
-		PRINTF("SEC>> IV: %d\n", (sp->flags & (0xff >> 2)));
+		PRINTF("SEC>> Flags: %d IV: %d\n", sp->flags, (sp->flags & (0xff >> 2)));
     PRINTF("SEC>> Size of encrypted payload: %d\n", payload_len);
 		if (call AMSend.send(dest, &am_pkt, pkt_len) == SUCCESS) {
 			sendBusy = TRUE;
-			PRINTF("RADIO>> Sent a packet to Thing %d\n", dest);		
-			//PRINTF("RADIO>> KNoT Payload Length: %d\n", len);
+			PRINTF("RADIO>> Sent a %s packet to Thing %d\n", 
+             cmdnames[cmd], dest);		
 		}
 		else {
-			PRINTF("ID: %d, Radio Msg could not be sent, channel busy\n", TOS_NODE_ID);
+			PRINTF("ID: %d, SEND FAILED\n", TOS_NODE_ID);
 			call LEDBlink.report_problem();
 		}
 		PRINTFFLUSH();
@@ -171,21 +161,15 @@ implementation {
     Packet *payload = (Packet *) (call AMSend.getPayload(&am_pkt, len));
     payload->flags = 0;
     payload->flags |= ASYMMETRIC_MASK; /* Set asymmetric flag */
-    if (len > MAX_PACKET_SIZE) {
-    	PRINTF("ERROR>> PACKET TOO BIG TO SEND\n");
-    	PRINTFFLUSH();
-    	return;
-    }
     memcpy(&(payload->ch), pdp, len);
     PRINTF("len: %d:%d\n", len, pdp->dp.dhdr.tlen);PRINTFFLUSH();
     if (call AMSend.send(dest, &am_pkt, len) == SUCCESS) {
       sendBusy = TRUE;
-      PRINTF("RADIO>> Sent a %s packet to Thing %d\n", cmdnames[payload->dp.hdr.cmd], dest);    
-      PRINTF("RADIO>> KNoT Payload Length: %d\n", payload->dp.dhdr.tlen);
+      PRINTF("RADIO>> Sent a %s packet to Thing %d, len: %d\n", cmdnames[payload->dp.hdr.cmd], dest, 
+                                                                payload->dp.dhdr.tlen);
     }
     else {
-      PRINTF("ID: %d, Radio Msg could not be sent, channel busy\n", TOS_NODE_ID);
-      PRINTF("len: %d\n", len);
+      PRINTF("ID: %d, SEND FAILED\n", TOS_NODE_ID);
       call LEDBlink.report_problem();
     }
     PRINTFFLUSH();
@@ -209,19 +193,18 @@ implementation {
 		send(state->remote_addr, pdp);
 	}
 
+  void send_on_sym_chan(ChanState *state, PDataPayload *pdp){
+    increment_seq_no(state);
+    send_encrypted(state->remote_addr, state->chan_num, pdp);
+  }
+
 	command void KNoT.knot_broadcast(ChanState *state){
 		increment_seq_no(state);
 		send_encrypted(AM_BROADCAST_ADDR, state->chan_num, 
                    (PDataPayload *)&(state->packet));
 	}
 
-  command void KNoT.receiveDecrypt(ChanState *state, SSecPacket *sp, uint8_t len, uint8_t *valid){
-    uint8_t cipher_len = len - sizeof(ChanHeader) - MAC_SIZE - FLAG_SIZE;
-    PRINTF("SYM>> Size of encrypted payload: %d\n", cipher_len);
-    call MiniSec.decrypt(&cc[state->chan_num], sp->flags, (uint8_t *)&(sp->dp), 
-                         cipher_len, (uint8_t *)&(sp->dp), (uint8_t *)&(sp->sh.tag), valid);
-    PRINTF("SYM>> Valid MAC: %s\n", (*valid?"yes":"no"));PRINTFFLUSH();
-  }
+
 
 /* Higher level calls */
 
@@ -283,11 +266,11 @@ implementation {
 		state->rate = rate;
 		new_pdp = (PDataPayload *) &(state->packet);
 		clean_packet(new_pdp);
-		pdp_complete(new_pdp, state->chan_num, HOME_CHANNEL, 
+		pdp_complete(new_pdp, state->chan_num, state->remote_chan_num, 
 	             CONNECT, sizeof(ConnectMsg));
 		cm = (ConnectMsg *)(new_pdp->dp.data);
 		cm->rate = rate;
-    call KNoT.send_on_chan(state, new_pdp);
+    send_on_sym_chan(state, new_pdp);
     set_ticks(state, TICKS);
     set_attempts(state, ATTEMPTS);
     set_state(state, STATE_CONNECT);
@@ -311,14 +294,13 @@ implementation {
 		pdp_complete(new_pdp, state->chan_num, state->remote_chan_num, 
 					CACK, sizeof(ConnectACKMsg));
 		ck->accept = 1;
-		call KNoT.send_on_chan(state, new_pdp);
+		send_on_sym_chan(state, new_pdp);
 		set_ticks(state, TICKS);
 		set_attempts(state, ATTEMPTS);
 		set_state(state, STATE_CONNECT);
-		PRINTF("KNOT>> %d wants to connect from channel %d\n", src, state->remote_chan_num);
-		PRINTFFLUSH();
+		PRINTF("KNOT>> %d wants to connect from channel %d at rate %d\n", src, state->remote_chan_num, 
+                                                                      state->rate);
 		PRINTF("KNOT>> Replying on channel %d\n", state->chan_num);
-		PRINTF("KNOT>> The rate is set to: %d\n", state->rate);
 		PRINTFFLUSH();
 	}
 
@@ -343,7 +325,7 @@ implementation {
 		clean_packet(new_pdp);
 		pdp_complete(new_pdp, state->chan_num, state->remote_chan_num, 
 	             CACK, NO_PAYLOAD);
-		call KNoT.send_on_chan(state, new_pdp);
+		send_on_sym_chan(state, new_pdp);
 		set_ticks(state, ticks_till_ping(state->rate));
 		set_attempts(state, ATTEMPTS);
 		set_state(state, STATE_CONNECTED);
@@ -389,7 +371,7 @@ implementation {
 	  new_pdp->ch.dst_chan_num = state->remote_chan_num;
     new_pdp->dp.dhdr.tlen = sizeof(ResponseMsg);
     PRINTF("Sending data\n");
-    call KNoT.send_on_chan(state, new_pdp);
+    send_on_sym_chan(state, new_pdp);
 	}
 
 	command void KNoT.response_handler(ChanState *state, PDataPayload *pdp){
@@ -405,7 +387,6 @@ implementation {
 		rmsg = (ResponseMsg *) &(pdp->dp.data);
 		memcpy(&temp, &(rmsg->data), 1);
 		PRINTF("KNOT>> Data rvd: %d\n", temp);
-		PRINTF("Temp: %d\n", temp);
 		//srmsg = (SerialResponseMsg *)dp->data;
 		//srmsg->src = state->remote_addr;
 		//send_on_serial(dp);
@@ -416,7 +397,7 @@ implementation {
 		clean_packet(new_pdp);
 		pdp_complete(new_pdp, state->chan_num, state->remote_chan_num, 
 	             RACK, NO_PAYLOAD);
-		call KNoT.send_on_chan(state, new_pdp);
+		send_on_sym_chan(state, new_pdp);
 	}
 	command void KNoT.rack_handler(ChanState *state, PDataPayload *pdp){
 		if (state->state != STATE_RACK_WAIT){
@@ -434,7 +415,7 @@ implementation {
 		clean_packet(new_pdp);
 		pdp_complete(new_pdp, state->chan_num, state->remote_chan_num, 
 		           PING, NO_PAYLOAD);
-		call KNoT.send_on_chan(state, new_pdp);
+		send_on_sym_chan(state, new_pdp);
 		set_state(state, STATE_PING);
 	}
 
@@ -448,7 +429,7 @@ implementation {
 		clean_packet(new_pdp);
 		pdp_complete(new_pdp, state->chan_num, state->remote_chan_num, 
 		           PACK, NO_PAYLOAD);
-		call KNoT.send_on_chan(state, new_pdp);
+		send_on_sym_chan(state, new_pdp);
 	}
 
 	command void KNoT.pack_handler(ChanState *state, PDataPayload *pdp){
@@ -478,10 +459,33 @@ implementation {
 		call KNoT.send_on_chan(state, new_pdp);
 	}
 
-	command void KNoT.init_symmetric(ChanState *state, uint8_t *key, uint8_t key_size){
-		call MiniSec.init(&cc[state->chan_num], key, key_size, 7);
 
+/*** SYMMETRIC CALLS AND HANDLERS ***/
+
+	command void KNoT.init_symmetric(ChanState *state, uint8_t *key, uint8_t key_size){
+    call MiniSec.init(&cc[state->chan_num], key, key_size, 7);
 	}
+
+  command void KNoT.receiveDecrypt(ChanState *state, SSecPacket *sp, uint8_t len, uint8_t *valid){
+    uint8_t cipher_len = len - sizeof(ChanHeader) - MAC_SIZE - FLAG_SIZE;
+    PRINTF("SYM>> e_payload size: %d\n", cipher_len);
+    call MiniSec.decrypt(&cc[state->chan_num], sp->flags, (uint8_t *)&(sp->dp), 
+                         cipher_len, (uint8_t *)&(sp->dp), (uint8_t *)&(sp->sh.tag), valid);
+    PRINTF("SYM>> Valid MAC: %s\n", (*valid?"yes":"no"));PRINTFFLUSH();
+  }
+
+  command void KNoT.sym_handover(ChanState *state){
+    PDataPayload *new_pdp = (PDataPayload *) &(state->packet);
+    clean_packet(new_pdp);
+    pdp_complete(new_pdp, state->chan_num, state->remote_chan_num, 
+               SYM_HANDOVER, NO_PAYLOAD);
+    send_on_sym_chan(state, new_pdp);
+    set_state(state, STATE_IDLE);
+  }
+
+  command void KNoT.sym_handover_handler(ChanState *state, PDataPayload *pdp){
+    set_state(state, STATE_IDLE);
+  }
 
 /*** ASYMMETRIC CALLS AND HANDLERS ***/
 	command void KNoT.init_asymmetric(uint16_t *priv_key, Point *pub_key, Point *pkc_sig){
@@ -518,11 +522,10 @@ implementation {
     memcpy(aa[state->chan_num].pubKey.y, a->pkc.pubKey.y, 20);
     memcpy(client_sig.x, a->pkc.sig.r, 20);
     memcpy(client_sig.y, a->pkc.sig.s, 20);
-    PRINTF("Chan %d\n", state->chan_num);PRINTFFLUSH();
     call ECDSA.reinit(&CAState);
     pass = call ECDSA.verify(msg, sizeof(Point), (NN_DIGIT *) (client_sig.x), 
                              (NN_DIGIT *) (client_sig.y), &CAPublicKey);
-  	PRINTF("ECC>> Certificate verification - %s(%d)\n", (pass == 1 ? "PASSED":"FAILED"), pass);
+  	PRINTF("ECC>> Cert verification - %s(%d)\n", (pass == 1 ? "PASSED":"FAILED"), pass);
     return pass;
   }
 
@@ -609,7 +612,6 @@ implementation {
     clen = call ECIES.encrypt((uint8_t *) a->e_payload, KEY_NONCE_CIPHER_LEN, 
                               (uint8_t *) &k, SYM_KEY_SIZE + NONCE_LEN, 
                                &(aa[state->chan_num].pubKey));
-    PRINTF("CLen: %d\n", clen);
     PRINTF("Done (%dbytes).\nECC>> Signing key + nonce...", clen); PRINTFFLUSH();
     call ECDSA.init(publicKey);
     call ECDSA.sign((uint8_t *) a->e_payload, KEY_NONCE_CIPHER_LEN, r, s, privateKey);
@@ -619,6 +621,7 @@ implementation {
     pdp_complete(new_pdp, state->chan_num, state->remote_chan_num, 
                  ASYM_KEY_RESP, sizeof(AsymKeyRespPayload));
     send_asym(state->remote_addr, new_pdp);
+    memcpy(state->key, symKey, SYM_KEY_SIZE);
   }
 
   command uint8_t KNoT.asym_key_resp_handler(ChanState *state, PDataPayload *pdp, uint32_t nonce){
@@ -627,9 +630,6 @@ implementation {
     uint8_t pass = 0, i = 0;
     AsymKeyPayload k;
     AsymKeyRespPayload *a = (AsymKeyRespPayload *) &(pdp->dp.data);
-    for (i = 0; i < 11; i++){
-    	PRINTF("%x:%x ",a->sig.r[i], a->sig.s[i]);
-    }PRINTF("\n");PRINTFFLUSH();
     call ECDSA.init(&(aa[state->chan_num].pubKey));
     pass = call ECDSA.verify((uint8_t *) a->e_payload, KEY_NONCE_CIPHER_LEN, 
                              (uint16_t *) a->sig.r, (uint16_t *) a->sig.s,
@@ -642,8 +642,11 @@ implementation {
                               (uint8_t *) a->e_payload, KEY_NONCE_CIPHER_LEN, 
                               privateKey);
     PRINTF("ECC>> Decryption - %s(%d)\n", (mlen > 0 ? "SUCCEEDED":"FAILED"), mlen);
-    PRINTF("Nonce: %lu\n", k.nonce);PRINTFFLUSH();
+    PRINTF("Nonce: %lu\n", k.nonce);
+    PRINTFFLUSH();
     if (nonce != k.nonce) return 0;
+    PRINTF("ECC>> KEY EXCHANGE SUCCEEDED\n");
+    PRINTFFLUSH();
     memcpy(state->key, k.sKey, SYM_KEY_SIZE);
     return 1;
   }
@@ -658,7 +661,7 @@ implementation {
 
 /*-----------Radio & AM EVENTS------------------------------- */
     event void RadioControl.startDone(error_t error) {
-    	PRINTF("*********************\n*** RADIO BOOTED ****\n*********************\n");
+    	PRINTF("*** RADIO BOOTED ****\n");
     	PRINTF("RADIO>> ADDR: %d\n", call AMPacket.address());
       PRINTFFLUSH();
     }
