@@ -6,8 +6,7 @@
 */ 
 #ifndef KNOT_PROTOCOL_H
 #define KNOT_PROTOCOL_H
-#include <stdint.h>
-
+ 
 //Sensor type
 #define TEMP   1
 #define HUM    2
@@ -31,31 +30,41 @@
 #define SEQACK  14
 #define RESPONSE 16
 
+#define ASYM_QUERY 17
+#define ASYM_RESPONSE 18
+#define ASYM_RESP_ACK 19
+#define ASYM_KEY_REQ  21
+#define ASYM_KEY_RESP 22
+#define SYM_HANDOVER  23
 
 #define CMD_LOW QUERY
-#define CMD_HIGH RESPONSE		/* change this if commands added */
+#define CMD_HIGH KEYACK		/* change this if commands added */
 
 /* =======================*/
 
-/* Macro signifying payload of 0 length */
-#define MAX_PACKET_SIZE    42
+#define MAX_PACKET_SIZE    110
 #define NO_PAYLOAD          0
-#define MAX_DATA_SIZE      32
+#define MAX_DATA_SIZE      100
 #define RESPONSE_DATA_SIZE 16
+#define SYM_KEY_SIZE       10
+#define ASYM_SIZE          84
 #define NAME_SIZE          16
 #define MAC_SIZE            4
-
-const char *cmdnames[17] = {"DUMMY0", "QUERY", "QACK","CONNECT", "CACK", 
-                                 "RSYN", "RACK", "DISCONNECT", "DACK",
-                                 "COMMAND", "COMMANDACK", "PING", "PACK", "SEQNO",
-                                 "SEQACK", "DUMMY1", "RESPONSE"};
+#define E_NONCE_SIZE       45 /* 4(nonce) + 20(KEY_SIZE) + 1 + 20(HMAC) */ 
+#define E_KEY_SIZE         55 /* 4(nonce) + 10(SYM_KEY_SIZE)+ 20(KEY_SIZE) + 1 + 20(HMAC) */
+const char *cmdnames[24] = {"DUMMY0", "QUERY", "QACK","CONNECT", "CACK", 
+                            "RSYN", "RACK", "DISCONNECT", "DACK",
+                            "COMMAND", "COMMANDACK", "PING", "PACK", "SEQNO",
+                            "SEQACK", "DUMMY1", "RESPONSE", "ASYM_QUERY",
+                            "ASYM_RESP", "ASYM_RESP_ACK", "DUMMY2", 
+                            "ASYM_KEY_REQ", "ASYM_KEY_RESP", "KEY_HANDOVER"};
 typedef nx_struct chan_header {
    nx_uint8_t src_chan_num;
    nx_uint8_t dst_chan_num;
 } ChanHeader;
 
 typedef nx_struct payload_header {
-   nx_uint8_t seqno;   /* sequence number */
+   nx_uint16_t seqno;   /* sequence number */
    nx_uint8_t cmd;	/* message type */
 } PayloadHeader;
 
@@ -69,6 +78,49 @@ typedef nx_struct data_payload {		/* template for data payload */
    nx_uint8_t data[MAX_DATA_SIZE];	/* data is address of MAX_DATA_SIZE bytes */
 } DataPayload;
 
+/*********************/
+/* Asymmetric Packet */
+typedef nx_struct pubKey {
+   nx_uint16_t x[10];
+   nx_uint16_t y[10];
+} PubKey; /* 40bytes */
+
+typedef nx_struct sig {
+   nx_uint16_t r[11];
+   nx_uint16_t s[11];
+} Signature; /* 42bytes */
+
+typedef nx_struct pkc {
+   PubKey pubKey;
+   Signature sig;
+} PKC; /* 80bytes */
+
+typedef nx_struct asym_query_payload {
+   PKC pkc;
+   nx_uint8_t flags; /* handshake/cipherSpec? */
+} AsymQueryPayload; /* 81bytes */
+
+typedef nx_struct asym_resp_ack_payload {
+   nx_uint8_t flags;
+} AsymRespACKPayload; /* 81bytes */
+
+typedef nx_struct asym_request_payload {
+   nx_uint8_t e_nonce[E_NONCE_SIZE];
+   Signature sig;
+} AsymKeyRequestPayload; /* 85bytes */
+
+typedef struct asym_key_payload {
+   uint32_t nonce;
+   nx_uint8_t sKey[10];
+} AsymKeyPayload;
+
+typedef nx_struct asym_key_tx_payload {
+   nx_uint8_t e_payload[E_KEY_SIZE];
+   Signature sig;
+} AsymKeyRespPayload;
+
+/********************/
+/* Symmetric Packet */
 typedef nx_struct sec_header {
    nx_uint8_t tag[MAC_SIZE];
 } SSecHeader;
@@ -81,6 +133,8 @@ typedef nx_struct symmetric_secure_data_payload {
    DataPayload dp;
 } SSecPacket;
 
+/****************/
+/* Plain Packet */
 typedef nx_struct plain_data_payload {
    ChanHeader ch;
    DataPayload dp;
@@ -91,6 +145,8 @@ typedef nx_struct packet {
    ChanHeader ch;
    DataPayload dp;
 } Packet;
+
+/********************/
 /* Message Payloads */
 
 typedef nx_struct query{
@@ -138,4 +194,5 @@ typedef nx_struct serial_cack{
    nx_uint8_t accept;
    nx_uint8_t src;
 }SerialConnectACKMsg;
+
 #endif /* KNOT_PROTOCOL_H */

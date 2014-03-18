@@ -30,11 +30,10 @@ module OCBModeP {
 }
 implementation
 {
-  /* there are many things hardcoded dependent on the blk size
-  * don't expect the code to work just by changing the value
-  * of BLOCK_SIZE
-  */
-
+  /* Block size if fixed at 8 bytes due to hardcoded values 
+   * inherited from MiniSec Lib + ocb.c
+   * To change block size, commented parts need to be changed
+   * appropriately */
 
   void xor_block(Block dst, Block src1, Block src2); 
   void shift_left(uint8_t *x);
@@ -52,11 +51,11 @@ implementation
     /* precompute L[i] values. L[0] is synonym of L */
     call Cipher.encrypt(&(context->cc), tmp, tmp);
     for(i = 0; i <= PRECOMP_BLOCKS; i++) {
-      memcpy(context->L[i], tmp, BLOCK_SIZE);//cpy tmp to L[i]
-      first_bit = tmp[0] & 0x80u;
+      memcpy(context->L[i], tmp, BLOCK_SIZE);
+      first_bit = tmp[0] & 0x80u; 
       shift_left(tmp);
       if(first_bit)
-        tmp[BLOCK_SIZE - 1] ^= 0x1B; /* this value is dependant on the blk size */
+        tmp[BLOCK_SIZE - 1] ^= 0x1B; /* CHANGE if block size changes */
     }
 
     /* precompute L_inv = L. x^{-1} */
@@ -65,7 +64,7 @@ implementation
     shift_right(tmp);
     if(last_bit) {
       tmp[0] ^= 0x80;
-      tmp[BLOCK_SIZE - 1] ^= 0x0D; /* this value depends on the blk size */
+      tmp[BLOCK_SIZE - 1] ^= 0x0D; /* CHANGE if block size changes */
     }
 
     memcpy(context->L_inv, tmp, BLOCK_SIZE);
@@ -191,6 +190,7 @@ implementation
     /* Calculate tag */
     xor_block(checksum, checksum, offset);
     call Cipher.encrypt(&(context->cc),checksum, tmp); 
+    /* Return valid == 1 if authentication successful */
     *valid = (memcmp(tag, tmp, TAG_LENGTH) == 0 ? 1 : 0);
     return SUCCESS;
   }

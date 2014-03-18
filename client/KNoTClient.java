@@ -76,15 +76,15 @@ public class KNoTClient implements MessageListener
         sendMsg(msg);
     }
 
-    void connect(int addr, int rate){
+    void connect(int chan, int rate){
         System.out.println("Initiating connection to " + addr + " at " + rate);
         DataPayloadMsg msg = new DataPayloadMsg();
-        msg.set_ch_src_chan_num((short) 0);
+        msg.set_ch_src_chan_num((short) chan);
         msg.set_ch_dst_chan_num((short) 0);
         msg.set_dp_hdr_seqno((short) 0);
         msg.set_dp_hdr_cmd((short) 3);
         msg.set_dp_dhdr_tlen((short) 2);
-        short data[] = {(short)addr, (short)rate};
+        short data[] = {(short)0, (short)rate};
         msg.set_dp_data(data);
         sendMsg(msg);
     }

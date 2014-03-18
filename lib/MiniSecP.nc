@@ -15,14 +15,11 @@
 #endif /* TAG_LEN */
 /* Lower N Bits */
 #define LNB_MASK(N) (0xff >> (8 - N))
-#define IV_BITS 6
+#define IV_BITS 6 /* Lower 6 bits of IV being TX'd */
 
 module MiniSecP @safe() {
   provides interface MiniSec as Sec;
-  uses {
-     // interface AMPacket;
-        interface OCBMode as CipherMode;
-  }
+  uses interface OCBMode as CipherMode;
 }
 implementation {
   uint16_t lastCount;
@@ -31,9 +28,6 @@ implementation {
   uint8_t keySize = 10;
   uint8_t preCombBlocks = 5;
   uint8_t tagLength = 4;
-  //CipherModeContext cc;
-  //uint8_t key[] = {0x05,0x15,0x25,0x35,0x45,0x55,0x65,0x75,0x85,0x95};
-  //uint8_t iv[] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
   uint8_t decryptedMsg[] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00, 
                             0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00, 
                             0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
@@ -54,37 +48,19 @@ implementation {
                          0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
                         };
   uint8_t testTag[] = {0x00,0x00,0x00,0x00};
-  uint8_t msg_d[] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00, 
-                     0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00, 
-                     0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-                     0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-                     0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-                    };
-  uint8_t cipher_rec[] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00, 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00, 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00, 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00, 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00, 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00, 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 };
-  uint8_t tag_rec[] = {0x00, 0x00, 0x00, 0x00};
-  
-  uint8_t max_times_inc_IV;
-  uint8_t nbre_times_inc_IV = 0;
+
   uint8_t nbreLB;
   uint8_t num_fails;
   uint8_t num_fb_resync; 
   uint8_t waiting_for_resync;
 
-  int IncIV(uint8_t *IV, uint8_t inc);
   error_t incrementIV(uint8_t *iv_block);
-
-  void DecIV(uint8_t *IV, uint8_t dec);
-  void decIV(uint8_t *IV);
-
+  
   void test(CipherModeContext *cc){
     uint8_t valid = 0;
-    //Sec.encrypt(plainMsg, 40, tag, 8, iv);
-    PRINTF("Plaintext block 0: %x\n", plainMsg[0]);
     call CipherMode.encrypt(cc, plainMsg, cipherMsg, 40, testTag);
-    PRINTF("Encrypted block 0: %x\n", cipherMsg[0]);PRINTFFLUSH();
     call CipherMode.decrypt(cc, cipherMsg, decryptedMsg, 40, testTag, &valid);
-    PRINTF("Plaintext block 0: %x\n", decryptedMsg[0]);
-    PRINTF("Valid MAC: %s\n", (valid?"yes":"no"));PRINTFFLUSH();
+    PRINTF("INIT SUCCESSFUL: %s\n", (valid?"YES":"NO"));PRINTFFLUSH();
   }
 
   command error_t Sec.init(CipherModeContext *cc, uint8_t *key, uint8_t key_size,
@@ -94,8 +70,6 @@ implementation {
     lastCount = 0;
     counter = 0;
     nbreLB = 1;
-    nbre_times_inc_IV = 0;
-    max_times_inc_IV= 1;
     num_fails = 0;
     num_fb_resync= 4;
     waiting_for_resync=0;
@@ -106,12 +80,10 @@ implementation {
   command error_t Sec.encrypt(CipherModeContext *cc, uint8_t *plain_blocks, uint8_t length, 
                               uint8_t *cipher_blocks, uint8_t *tag) {
     PRINTF("len: %d\n", length);
-    PRINTF("IV = %d\n", cc->iv[7]);
+    PRINTF("IV was = %d\n", cc->iv[7]);
     if(incrementIV(cc->iv)) {PRINTF("OH NOES\n");return FAIL;}
-    PRINTF("IV = %d\n", cc->iv[7]);
+    PRINTF("IV now = %d\n", cc->iv[7]);
     call CipherMode.encrypt(cc, plain_blocks, cipher_blocks, length, tag);
-    //memcpy(data, cipherMsg, length);
-    PRINTF("cipher_tag_len: %d\n", length + TAG_LEN);
     return length + TAG_LEN;
   }
 
@@ -120,15 +92,13 @@ implementation {
     uint8_t attempts_left = 63;
     while (attempts_left-- && ((cc->iv[7] & LNB_MASK(IV_BITS)) != (iv & LNB_MASK(IV_BITS)))){
       incrementIV(cc->iv);
-      PRINTF("+1\n");
     }
     if (attempts_left == 0) return FAIL;
-    PRINTF("IV = %d\n", cc->iv[7]);
+    PRINTF("IV now = %d\n", cc->iv[7]);
     call CipherMode.decrypt(cc, cipher_blocks, plain_blocks,
                               length, tag, valid);
     return *valid;
   }
-
 
   error_t incrementIV(uint8_t *iv_block) {
     uint8_t i;

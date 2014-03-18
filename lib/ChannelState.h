@@ -17,7 +17,10 @@
 #define STATE_COMMANDED  9
 #define STATE_RSYN       10
 #define STATE_RACK_WAIT  11
-
+#define STATE_ASYM_QUERY 12
+#define STATE_ASYM_RESP  13
+#define STATE_ASYM_RESP_ACK 14
+#define STATE_ASYM_REQ_KEY 15
 /* Sets the channel state to the specified state */
 #define set_state(chanstate, status) chanstate->state = status
 
@@ -45,7 +48,8 @@ typedef struct channel_state{
    uint8_t ticks_left;
    uint8_t ticks_till_ping;
    uint8_t attempts_left;
-   PDataPayload packet;
+   uint8_t key[SYM_KEY_SIZE];
+   uint8_t packet[MAX_PACKET_SIZE];
 }ChanState;
 
 

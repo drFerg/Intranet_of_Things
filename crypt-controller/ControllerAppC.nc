@@ -1,4 +1,4 @@
-#include "AMKNoT.h"
+includes AMKNoT;
 configuration ControllerAppC { }
 implementation
 {
@@ -16,7 +16,6 @@ implementation
 
     ControllerC.Boot -> MainC;
     ControllerC.SerialControl -> SerialActiveMessageC;
-
     ControllerC.SerialSend -> SerialAMSenderC;
     ControllerC.SerialReceive ->SerialAMReceiverC;
     ControllerC.ChannelTable -> ChannelTableC;
@@ -24,5 +23,4 @@ implementation
     ControllerC.CleanerTimer -> TimerMilliC;
     ControllerC.LEDBlink -> LEDBlinkC;
     ControllerC.KNoT -> KNoTCryptC;
-
 }

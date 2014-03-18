@@ -1,4 +1,4 @@
-#include "AMKNoT.h"
+includes AMKNoT;
 configuration SensorAppC { }
 implementation
 {
@@ -15,8 +15,8 @@ implementation
 
 /* Sensors */
     #if TELOS
-    components new HamamatsuS10871TsrC() as LightSensor,
-    new SensirionSht11C() as TempSensor;
+    //components new HamamatsuS10871TsrC() as LightSensor,
+    components new SensirionSht11C() as TempSensor;
     #else
     components new DemoSensorC() as LightSensor,
     new DemoSensorC() as TempSensor;
@@ -28,7 +28,7 @@ implementation
     SensorC.ChannelState -> ChannelStateC;
     SensorC.Timer -> TimerMilliC;
     SensorC.CleanerTimer -> Cleaner;
-    SensorC.LightSensor -> LightSensor;
+    //SensorC.LightSensor -> LightSensor;
     #if TELOS
     SensorC.TempSensor -> TempSensor.Temperature;
     #else 
