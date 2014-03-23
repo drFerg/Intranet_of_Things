@@ -64,8 +64,7 @@ module KNoTCryptP @safe() {
 }
 implementation {
 	message_t am_pkt;
-	message_t serial_pkt;
-	bool serialSendBusy = FALSE;
+
 	bool sendBusy = FALSE;
   /* Symmetric state */
 	CipherModeContext cc[CHANNEL_NUM + 1];
@@ -246,7 +245,7 @@ implementation {
 	}
 
 	command void KNoT.qack_handler(ChanState *state, PDataPayload *pdp, uint8_t src) {
-		SerialQueryResponseMsg *qr;
+		//SerialQueryResponseMsg *qr;
 		if (state->state != STATE_QUERY) {
 			PRINTF("KNOT>> Not in Query state\n");
 			return;
@@ -307,7 +306,7 @@ implementation {
 	command uint8_t KNoT.controller_cack_handler(ChanState *state, PDataPayload *pdp){
 		ConnectACKMsg *ck = (ConnectACKMsg*)(pdp->dp.data);
 		PDataPayload *new_pdp;
-		SerialConnectACKMsg *sck;
+		//SerialConnectACKMsg *sck;
 		if (state->state != STATE_CONNECT){
 			PRINTF("KNOT>> Not in Connecting state\n");
 			return -1;
@@ -358,12 +357,14 @@ implementation {
       clean_packet(new_pdp);
       new_pdp->dp.hdr.cmd = RESPONSE;
       state->ticks_till_ping--;
-    } else if(state->state == STATE_RSYN){
+    } 
+    else if(state->state == STATE_RSYN){
     	clean_packet(new_pdp);
 	    new_pdp->dp.hdr.cmd = RSYN; // Send to ensure controller is still out there
 	    state->ticks_till_ping = RSYN_RATE;
 	    set_state(state, STATE_RACK_WAIT);
-    } else if (state->state == STATE_RACK_WAIT){
+    } 
+    else if (state->state == STATE_RACK_WAIT){
     	return; /* Waiting for response, no more sensor sends */
     }
     memcpy(&(rmsg->data), data, len);
@@ -374,22 +375,18 @@ implementation {
     send_on_sym_chan(state, new_pdp);
 	}
 
-	command void KNoT.response_handler(ChanState *state, PDataPayload *pdp){
+	command uint8_t KNoT.response_handler(ChanState *state, PDataPayload *pdp, uint8_t *buf){
 		ResponseMsg *rmsg;
-		SerialResponseMsg *srmsg;
-		uint8_t temp;
 		if (state->state != STATE_CONNECTED && state->state != STATE_PING){
 			PRINTF("KNOT>> Not connected to device!\n");
-			return;
+			return 0;
 		}
 		set_ticks(state, ticks_till_ping(state->rate)); /* RESET PING TIMER */
 		set_attempts(state, ATTEMPTS);
 		rmsg = (ResponseMsg *) &(pdp->dp.data);
-		memcpy(&temp, &(rmsg->data), 1);
-		PRINTF("KNOT>> Data rvd: %d\n", temp);
-		//srmsg = (SerialResponseMsg *)dp->data;
-		//srmsg->src = state->remote_addr;
-		//send_on_serial(dp);
+		memcpy(buf, &(rmsg->data), 1);
+		PRINTF("KNOT>> Data rvd: %d\n", buf[0]);
+    return 1;
 	}
 
 	command void KNoT.send_rack(ChanState *state){

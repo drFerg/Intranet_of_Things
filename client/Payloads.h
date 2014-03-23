@@ -7,6 +7,7 @@
 
 enum {
   AM_PLAIN_DATA_PAYLOAD = 10,
+  AM_SERIAL_RESPONSE = 10,
   DEFAULT_MESSAGE_SIZE = 40
 };
 
@@ -50,3 +51,8 @@ typedef nx_struct packet {
    nx_uint8_t flags;
    nx_uint8_t data[MAX_PACKET_SIZE];
 } Packet;
+
+typedef nx_struct serial_response{
+   nx_uint8_t data;
+   nx_uint8_t src;
+}SerialResponseMsg;

@@ -89,7 +89,7 @@ implementation
           }*/
   }
         /*------------------------------------------------------- */
-  ChanState * pkc_verification(PDataPayload *pdp, uint8_t src){
+  ChanState *verify_pkc(PDataPayload *pdp, uint8_t src){
     /*Assume most certificates will be good */
     ChanState *state = call ChannelTable.new_channel(); 
     if (call KNoT.asym_pkc_handler(state, pdp) != VALID_PKC) {
@@ -124,9 +124,7 @@ implementation
     call LEDBlink.report_problem();
     call ChannelTable.init_table();
     call ChannelState.init_state(&home_chan, 0);
-    //call Timer.startOneShot(5000);
     call CleanerTimer.startPeriodic(TICK_RATE);
-    //call KNoT.init_symmetric(&home_chan, testKey, testKey_size);
     call KNoT.init_asymmetric(privateKey, &publicKey, &pkc_signature);
   }
 
@@ -155,8 +153,7 @@ implementation
       if (sp->ch.dst_chan_num) { /* Get state for channel */ 
         state = retrieve_state(sp->ch.dst_chan_num, &(sp->ch), pdp, src);
         if (!state) return msg;
-      }
-      else state = &home_chan;
+      } else state = &home_chan;
       call KNoT.receiveDecrypt(state, sp, len, &valid);
       if (!valid) return msg; /* Return if decryption failed */
       pdp = (PDataPayload *) (&sp->ch); /* Offsetting to start of pdp */
@@ -166,7 +163,7 @@ implementation
       pdp = (PDataPayload *) &(p->ch);
       if (pdp->dp.hdr.cmd == ASYM_QUERY){
         PRINTF("Received query\n");PRINTFFLUSH();
-        state = pkc_verification(pdp, src);
+        state = verify_pkc(pdp, src);
         if (!state) return msg;
         call KNoT.send_asym_resp(state);
         set_state(state, STATE_ASYM_RESP);
@@ -217,7 +214,11 @@ implementation
       case(PING): call KNoT.ping_handler(state, pdp); break;
       case(PACK): call KNoT.pack_handler(state, pdp); break;
       case(RACK): call KNoT.rack_handler(state, pdp); break;
-      case(DISCONNECT): call KNoT.disconnect_handler(state, pdp); call Timer.stop();break;
+      case(DISCONNECT): {
+        call KNoT.disconnect_handler(state, pdp); 
+        call Timer.stop();
+        break;
+      }
       default: PRINTF("Unknown CMD type\n");
     }
     call LEDBlink.report_received();

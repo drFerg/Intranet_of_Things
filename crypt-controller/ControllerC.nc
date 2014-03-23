@@ -38,9 +38,9 @@ module ControllerC @safe()
 }
 implementation
 {
+  bool serialSendBusy = FALSE;
 	ChanState home_chan;
   uint32_t nonce;
-	bool serialSendBusy = FALSE;
 	uint8_t testKey[] = {0x05,0x15,0x25,0x35,0x45,0x55,0x65,0x75,0x85,0x95};
 	uint8_t testKey_size = 10;
   Point publicKey = { .x = {0x5d75, 0xa416, 0x94f6, 0x703e, 0x7f9e, 0xf511, 0x3315, 0x3b73, 0x7ca8, 0x442b},
@@ -84,7 +84,7 @@ implementation
 	}
 
 
-  ChanState *pkc_verification(PDataPayload *pdp, uint8_t src){
+  ChanState *verify_pkc(PDataPayload *pdp, uint8_t src){
     /*Assume most certificates will be good */
     ChanState *state = call ChannelTable.new_channel(); 
     if (call KNoT.asym_pkc_handler(state, pdp) != VALID_PKC) {
@@ -110,17 +110,38 @@ implementation
     } 
     else return s;
   }
-      
+
+  void send_on_serial(PDataPayload *pdp) {
+    message_t serial_pkt;
+    PDataPayload *pkt = (PDataPayload *) (call SerialSend.getPayload(&serial_pkt, sizeof(DataPayload)));
+    memcpy(pkt, pdp, sizeof(PDataPayload));
+    if (call SerialSend.send(0, &serial_pkt, sizeof(PDataPayload)) == SUCCESS){
+      serialSendBusy = TRUE;
+    } 
+    else {
+      PRINTF("Couldn't send serial pkt\n");
+      call LEDBlink.report_problem();
+      }
+  }
+
+  void forward_to_cache(ChanState *state, uint8_t *data, uint8_t len) {
+    PDataPayload *new_dp = (PDataPayload *)&(state->packet); 
+    SerialResponseMsg *srmsg = (SerialResponseMsg *) new_dp->dp.data;
+    memcpy(&(srmsg->data), data, len);
+    srmsg->src = state->remote_addr;
+    pdp_complete(new_pdp, state->chan_num, state->remote_chan_num, 
+               RESPONSE, sizeof(SerialResponseMsg));
+    send_on_serial(new_dp);
+  }
 	/*------------------------------------------------- */
 	
 	event void Boot.booted() {
-		PRINTF("\n*********************\n****** BOOTED *******\n*********************\n");
+		PRINTF("\n****** BOOTED *******\n");
     PRINTFFLUSH();
     call LEDBlink.report_problem();
     call ChannelTable.init_table();
     call ChannelState.init_state(&home_chan, 0);
     call CleanerTimer.startPeriodic(TICK_RATE);
-    //call KNoT.init_symmetric(&home_chan, testKey, testKey_size);
     call KNoT.init_asymmetric(privateKey, &publicKey, &pkc_signature);
     }
     
@@ -132,15 +153,17 @@ implementation
   event message_t* KNoT.receive(uint8_t src, message_t* msg, void* payload, uint8_t len) {
     uint8_t valid = 0;
   	ChanState *state;
+    uint8_t recvBuff[10];
   	uint8_t cmd;
   	Packet *p = (Packet *) payload;
     SSecPacket *sp = NULL;
     PDataPayload *pdp = NULL;
     ChanHeader *ch = NULL;
-	/* Gets data from the connection */
+
     call LEDBlink.report_received();
 	  PRINTF("SEC>> Received %s packet\n", is_symmetric(p->flags)?"Symmetric":
-    			                               is_asymmetric(p->flags)?"Asymmetric":"Plain");
+    			 is_asymmetric(p->flags)?"Asymmetric":"Plain");
+    
     /* SYMMETRIC RECEIVE AND DECRYPT */
   	if (is_symmetric(p->flags)) {
       sp = (SSecPacket *) p;
@@ -152,20 +175,22 @@ implementation
   		call KNoT.receiveDecrypt(state, sp, len, &valid);
       if (!valid) return msg; /* Return if decryption failed */
   		pdp = (PDataPayload *) (&sp->ch); /* Offsetting to start of pdp */
-  	} /* ASYMMETRIC RECIEVE, DECRYPT AND PROCESS */
-    else if (is_asymmetric(p->flags)) {
+  	} 
+    /* ASYMMETRIC RECIEVE, DECRYPT AND PROCESS */
+    else if (is_asymmetric(p->flags)) { 
       if (!isAsymActive()) return msg; /* Don't waste time/energy */
       pdp = (PDataPayload *) &(p->ch);
+
       if (pdp->dp.hdr.cmd == ASYM_QUERY){
         PRINTF("Received query\n");PRINTFFLUSH();
-        state = pkc_verification(pdp, src);
+        state = verify_pkc(pdp, src);
         if (!state) return msg;
         call KNoT.send_asym_resp(state);
         set_state(state, STATE_ASYM_RESP);
       }
       else if (pdp->dp.hdr.cmd == ASYM_RESPONSE){
         PRINTF("Received response %d\n", pdp->ch.dst_chan_num);PRINTFFLUSH();
-        state = pkc_verification(pdp, src);
+        state = verify_pkc(pdp, src);
         if (!state) return msg;
         call KNoT.send_resp_ack(state);
         set_state(state, STATE_ASYM_RESP);
@@ -195,9 +220,9 @@ implementation
           call KNoT.sym_handover(state);
         }
       }
-      PRINTF("returning...\n"); PRINTFFLUSH();
       return msg;
-    } /* PLAIN PACKET */
+    } 
+    /* PLAIN PACKET */
     else {
       pdp = (PDataPayload *) &(p->ch);
       /* Grab state for requested channel */
@@ -227,20 +252,31 @@ implementation
   	}
   	switch(cmd) {
   		case(CACK): call KNoT.controller_cack_handler(state, pdp); break;
-  		case(RESPONSE): call KNoT.response_handler(state, pdp); break;
-  		case(RSYN): call KNoT.response_handler(state, pdp); call KNoT.send_rack(state); break;
-  		// case(CMDACK):   	command_ack_handler(state,pdp);break;
+  		case(RESPONSE): {
+        call KNoT.response_handler(state, pdp, recvBuff); 
+        forward_to_cache(state, recvBuff, 1);
+        break;
+      }
+  		case(RSYN): {
+        call KNoT.response_handler(state, pdp, recvBuff);
+        forward_to_cache(state, recvBuff, 1);
+        call KNoT.send_rack(state); 
+        break;
+      }
+      // case(CMDACK):    command_ack_handler(state,pdp);break;
   		case(PING): call KNoT.ping_handler(state, pdp); break;
   		case(PACK): call KNoT.pack_handler(state, pdp); break;
-  		case(DISCONNECT): call KNoT.disconnect_handler(state, pdp); 
-  	                    call ChannelTable.remove_channel(state->chan_num); break;
+  		case(DISCONNECT): {
+        call KNoT.disconnect_handler(state, pdp); 
+        call ChannelTable.remove_channel(state->chan_num); 
+        break;
+      }
   		default: PRINTF("Unknown CMD type\n");
   	}
     call LEDBlink.report_received();
     return msg; /* Return packet to TinyOS */
   }
 
-    
 	event message_t *SerialReceive.receive(message_t *msg, void* payload, uint8_t len){
   	PDataPayload *pdp = (PDataPayload *)payload;
     ChanState *s;
@@ -257,10 +293,11 @@ implementation
 		switch (cmd) {
 			case(QUERY): call KNoT.send_asym_query(&home_chan);break;
       //case(QUERY): call KNoT.query(&home_chan, 1/*((QueryMsg*)dp)->type*/);break;
-			case(CONNECT): 
+			case(CONNECT): {
         s = call ChannelTable.get_channel_state(pdp->ch.src_chan_num);
         call KNoT.connect(s, s->remote_addr, ((SerialConnect*)data)->rate);
         break;
+      }
 		}
 		call LEDBlink.report_received();
   	return msg;

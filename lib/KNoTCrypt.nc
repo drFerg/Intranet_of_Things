@@ -25,7 +25,7 @@ interface KNoTCrypt{
 
 	command void send_value(ChanState *state, uint8_t *data, uint8_t len);
 
-	command void response_handler(ChanState *state, PDataPayload *pdp);
+	command uint8_t response_handler(ChanState *state, PDataPayload *pdp, uint8_t *buf);
 	
 	command void send_rack(ChanState *state);
 	command void rack_handler(ChanState *state, PDataPayload *pdp);
