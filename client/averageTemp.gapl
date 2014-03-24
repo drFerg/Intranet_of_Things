@@ -1,0 +1,34 @@
+subscribe t to Temp;
+associate a with TempAvgs;
+identifier id; 
+int avg;
+sequence s;
+int count;
+behavior {
+	id = Identifier(t.src);
+	if (hasEntry(a, id)) {
+		avg = seqElement(lookup(a, id), 2);
+		count = seqElement(lookup(a, id), 3);
+	}
+	else {
+		avg = 0;
+		count = 0;
+	}
+	print(String('old average ', avg));
+	print(String('count ', count));
+	avg = (avg * count)  + t.temp;
+	if (count < 30)
+		count+= 1;
+	avg = avg / count;
+
+	print(String('new average ', avg));
+	print(String('count ', count));
+
+	s = Sequence(t.src, t.temp, avg, count);
+	if (t.temp > avg)
+		send(s, 'temp exceeded!');
+	else if (t.temp < avg)
+		send(s, 'temp dropped!');
+
+	insert(a, id, s);
+}
