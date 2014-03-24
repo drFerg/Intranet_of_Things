@@ -19,7 +19,7 @@ SerialResponseMsg.java: ../lib/KNoTProtocol.h
 
 
 KNoTClient.class: $(wildcard *.java) $(GEN)
-	javac *.java -cp $$CLASSPATH
+	javac *.java
 
 clean:
 	rm -f *.class $(GEN)

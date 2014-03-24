@@ -2,8 +2,12 @@ import net.tinyos.message.*;
 import net.tinyos.util.*;
 import java.io.*;
 import java.util.Scanner;
-import cache.*;
-
+import jCache.*;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
+import java.nio.file.Files;
+import java.nio.ByteBuffer;
 public class KNoTClient implements MessageListener
 {
 
@@ -40,7 +44,7 @@ public class KNoTClient implements MessageListener
     }
 
     /* Main entry point */
-    void run() {
+    void run(String automaton) {
         mote = new MoteIF(PrintStreamMessenger.err);
         mote.registerListener(new DataPayloadMsg(), this);
         try {
@@ -52,8 +56,9 @@ public class KNoTClient implements MessageListener
             recvr = new Receiver(service, this);
             recvrThread = new Thread(recvr);
             recvrThread.start();
-            System.out.println(conn.call(String.format("SQL:create table Temp (t integer) 127.0.0.1 %d %s", port, serviceName)));
-            System.out.println(conn.call(String.format("SQL:register \"subscribe temp to Temp; behavior { send(temp); }\" 127.0.0.1 %d %s", port, serviceName)));
+            //System.out.println(conn.call(String.format("SQL:create table Temp (id integer, temp integer) 127.0.0.1 %d %s", port, serviceName)));
+            //System.out.println(conn.call(String.format("SQL:create persistenttable Averages (id integer primary key, avg integer)")));
+            System.out.println(conn.call(String.format("SQL:register \"%s\" 127.0.0.1 %d %s", automaton, port, serviceName)));
         }
         catch (Exception e) {
             System.exit(1);
@@ -111,8 +116,9 @@ public class KNoTClient implements MessageListener
         if (msg instanceof DataPayloadMsg) {
             System.out.print("Received data: Temp is: ");
             int val = ((DataPayloadMsg)msg).get_dp_data()[0];
+            int src = ((DataPayloadMsg)msg).get_dp_data()[1];
             System.out.println(val);
-            String cmd = String.format("SQL:insert into Temp values ('%d') 127.0.0.1 %d %s", val, port, serviceName);
+            String cmd = String.format("SQL:insert into Temp values ('%d', '%d') 127.0.0.1 %d %s", src, val, port, serviceName);
             System.out.println(cmd);
             try {
                 System.out.println(conn.call(cmd));
@@ -143,6 +149,20 @@ public class KNoTClient implements MessageListener
 
     public static void main(String[] args) {
         KNoTClient me = new KNoTClient();
-        me.run();
+        String content = "";
+        try {
+            content = readFile(args[0], Charset.defaultCharset());
+        } catch (IOException e) {
+            System.out.println("File not found");
+        }
+        content = content.replaceAll("\n", " ").replaceAll("\\s+", " ");
+        System.out.println(content);
+        me.run(content);
+    }
+
+    static String readFile(String path, Charset encoding) throws IOException {
+        byte[] encoded = Files.readAllBytes(Paths.get(path));
+        return encoding.decode(ByteBuffer.wrap(encoded)).toString();
     }
 }
+

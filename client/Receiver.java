@@ -1,5 +1,5 @@
 import java.io.*;
-import cache.*;
+import jCache.*;
 class Receiver implements Runnable {
     private Service service;
     private KNoTClient client;
