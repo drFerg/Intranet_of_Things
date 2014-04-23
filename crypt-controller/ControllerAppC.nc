@@ -4,6 +4,7 @@ implementation
 {
     components ControllerC, MainC, SerialStartC, SerialActiveMessageC;
     components KNoTCryptC, ChannelTableC, ChannelStateC, LEDBlinkC;
+    components LocalTimeMilliC;
 /* Debug */
     #if DEBUG
     components PrintfC;
@@ -23,4 +24,5 @@ implementation
     ControllerC.CleanerTimer -> TimerMilliC;
     ControllerC.LEDBlink -> LEDBlinkC;
     ControllerC.KNoT -> KNoTCryptC;
+    ControllerC.LocalTime -> LocalTimeMilliC;
 }

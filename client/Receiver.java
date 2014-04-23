@@ -13,7 +13,9 @@ class Receiver implements Runnable {
         try {
             Message query;
             while ((query = service.query()) != null) {
-                System.out.println(query.getContent());
+                String s = query.getContent();
+                //System.out.println(s);
+                client.markEnd(System.currentTimeMillis());
                 query.getConnection().response("OK");
             }
         } catch (IOException e) {

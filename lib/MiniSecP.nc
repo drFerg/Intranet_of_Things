@@ -13,6 +13,7 @@
 #ifndef TAG_LEN
 #define TAG_LEN 4
 #endif /* TAG_LEN */
+
 /* Lower N Bits */
 #define LNB_MASK(N) (0xff >> (8 - N))
 #define IV_BITS 6 /* Lower 6 bits of IV being TX'd */
@@ -22,58 +23,35 @@ module MiniSecP @safe() {
   uses interface OCBMode as CipherMode;
 }
 implementation {
-  uint16_t lastCount;
-  uint16_t counter;
-  uint8_t blockSize = 8;
-  uint8_t keySize = 10;
-  uint8_t preCombBlocks = 5;
-  uint8_t tagLength = 4;
-  uint8_t decryptedMsg[] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00, 
-                            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00, 
-                            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-                            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-                            0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-                            };
-
-  uint8_t plainMsg[] = {0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08, 
-                        0x09,0x0a,0x0b,0x0c,0x0d,0x0e,0x0f,0x10,
-                        0x11,0x12,0x13,0x14,0x15,0x16,0x01,0x02,
-                        0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0a,
-                        0x0b,0x0c,0x0d,0x0e,0x0f,0x10,0x11,0x12
-                        };
-  uint8_t cipherMsg[] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00, 
-                         0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00, 
-                         0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-                         0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-                         0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-                        };
-  uint8_t testTag[] = {0x00,0x00,0x00,0x00};
-
-  uint8_t nbreLB;
-  uint8_t num_fails;
-  uint8_t num_fb_resync; 
-  uint8_t waiting_for_resync;
 
   error_t incrementIV(uint8_t *iv_block);
   
+#ifdef DEBUG
+#define TEST_LEN 16
   void test(CipherModeContext *cc){
+    uint8_t testTag[] = {0x00,0x00,0x00,0x00};
+    uint8_t plainMsg[] = {0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08, 
+                          0x09,0x0a,0x0b,0x0c,0x0d,0x0e,0x0f,0x10,
+                        };
+    uint8_t decryptedMsg[TEST_LEN];
+    uint8_t cipherMsg[TEST_LEN];
     uint8_t valid = 0;
-    call CipherMode.encrypt(cc, plainMsg, cipherMsg, 40, testTag);
-    call CipherMode.decrypt(cc, cipherMsg, decryptedMsg, 40, testTag, &valid);
+    memset(&decryptedMsg, 0, TEST_LEN);
+    memset(&cipherMsg, 0, TEST_LEN);
+
+    call CipherMode.encrypt(cc, plainMsg, cipherMsg, TEST_LEN, testTag);
+    call CipherMode.decrypt(cc, cipherMsg, decryptedMsg, TEST_LEN, testTag, &valid);
     PRINTF("INIT SUCCESSFUL: %s\n", (valid?"YES":"NO"));PRINTFFLUSH();
   }
+#endif /* DEBUG */
 
   command error_t Sec.init(CipherModeContext *cc, uint8_t *key, uint8_t key_size,
                             uint8_t num_precomp_blks) {    
     call CipherMode.init(cc, key_size, key, TAG_LEN, num_precomp_blks); 
     memset(&(cc->iv), 0, BLOCK_SIZE);
-    lastCount = 0;
-    counter = 0;
-    nbreLB = 1;
-    num_fails = 0;
-    num_fb_resync= 4;
-    waiting_for_resync=0;
+#ifdef DEBUG
     test(cc);
+#endif /* DEBUG */
     return SUCCESS;
   }
 

@@ -14,6 +14,7 @@ implementation {
     /*ECC encryption components */
     components NNM, ECCC, ECDSAC, ECIESC;
     components RandomLfsrC;
+    components LocalTimeMilliC;
 
     components new AMSenderC(AM_KNOT_MESSAGE);
     components new AMReceiverC(AM_KNOT_MESSAGE);
@@ -23,7 +24,7 @@ implementation {
     KNoTCryptP.Random -> RandomLfsrC;
     KNoTCryptP.RadioControl -> ActiveMessageC;
     KNoTCryptP.AMSend -> AMSenderC;
-    KNoTCryptP.AMPacket ->AMSenderC;
+    KNoTCryptP.AMPacket -> AMSenderC;
     KNoTCryptP.Receive -> AMReceiverC;
     KNoTCryptP.LEDBlink -> LEDBlinkC;
     KNoTCryptP.MiniSec -> MiniSecC;
@@ -31,4 +32,5 @@ implementation {
     KNoTCryptP.ECC -> ECCC.ECC;
     KNoTCryptP.ECDSA -> ECDSAC; /* Sign/Verify */
     KNoTCryptP.ECIES -> ECIESC; /* Encrypt/Decrypt */
+    KNoTCryptP.LocalTime -> LocalTimeMilliC;
 }

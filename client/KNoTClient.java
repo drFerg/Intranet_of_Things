@@ -21,6 +21,7 @@ public class KNoTClient implements MessageListener
     Connection conn;
     Receiver recvr;
     Thread recvrThread;
+    long start_t = 0;
 
     private void cli(){
         Scanner input = new Scanner(System.in);
@@ -96,6 +97,16 @@ public class KNoTClient implements MessageListener
         msg.set_dp_data(convertStringToShort("1Client\0"));
         sendMsg(msg);
     }
+    void command(){
+        System.out.println("Sending command");
+        DataPayloadMsg msg = new DataPayloadMsg();
+        msg.set_ch_src_chan_num((short) 0);
+        msg.set_ch_dst_chan_num((short) 0);
+        msg.set_dp_hdr_seqno((short) 0);
+        msg.set_dp_hdr_cmd((short) 9);
+        msg.set_dp_dhdr_tlen((short) 0);
+        sendMsg(msg);
+    }
 
     void connect(int chan, int addr, int rate){
         System.out.println("Initiating connection to " + addr + " at " + rate);
@@ -110,28 +121,35 @@ public class KNoTClient implements MessageListener
         sendMsg(msg);
     }
 
-
+    public synchronized void markEnd(long end_t){
+        long elapsed = end_t - start_t;
+        //System.out.println("Start: " + start_t + " end: " + end_t);
+        System.out.println(elapsed);
+        command();
+    }
 
     public synchronized void messageReceived(int dest_addr, net.tinyos.message.Message msg) {
         if (msg instanceof DataPayloadMsg) {
-            System.out.print("Received data: Temp is: ");
+            //System.out.print("Received data: Temp is: ");
             int val = ((DataPayloadMsg)msg).get_dp_data()[0];
             int src = ((DataPayloadMsg)msg).get_dp_data()[1];
-            System.out.println(val);
+            //System.out.println(val);
             String cmd = String.format("SQL:insert into Temp values ('%d', '%d') 127.0.0.1 %d %s", src, val, port, serviceName);
-            System.out.println(cmd);
+            //System.out.println(cmd);
+            start_t = System.currentTimeMillis();
             try {
-                System.out.println(conn.call(cmd));
+                String s = conn.call(cmd);
+                //System.out.println(s);
             } 
             catch (Exception e) {
                 System.exit(1);
             }
             if (((DataPayloadMsg)msg).get_dp_hdr_cmd() == 16){
-                System.out.print("Received data: Temp is: ");
-                System.out.println(val);
+                //System.out.print("Received data: Temp is: ");
+                //System.out.println(val);
             }
         }
-        System.out.println(">> ");
+        //System.out.println(">> ");
     }
 
     void sendMsg(DataPayloadMsg msg) {
@@ -150,6 +168,9 @@ public class KNoTClient implements MessageListener
     public static void main(String[] args) {
         KNoTClient me = new KNoTClient();
         String content = "";
+        if (args.length < 1){
+            System.out.println("usage: KnotClient <automaton>");
+        }
         try {
             content = readFile(args[0], Charset.defaultCharset());
         } catch (IOException e) {

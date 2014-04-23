@@ -27,11 +27,11 @@ CFLAGS+=-DCURVE_OPT  #optimization for secg curve
 ##ECC
 CFLAGS+=-DPROJECTIVE  #projective coordinate
 CFLAGS+=-DSLIDING_WIN  #sliding window method, windows size is defined in ECC.h
-#CFLAGS+=-DSHAMIR_TRICK
+CFLAGS+=-DSHAMIR_TRICK
 CFLAGS += -I$(TOSDIR)/lib/printf -DPRINTF_BUFFER_SIZE=500 -DNEW_PRINTF_SEMANTICS
 CFLAGS += -DTOSH_DATA_LENGTH=120
 CFLAGS += -DTELOS -DDEBUG
-CFLAGS += -DDEVICE_NAME=\"Sensor\" -DSENSOR_TYPE=1 -DDATA_RATE=1 -DCHANNEL_NUM=5
+CFLAGS += -DDEVICE_NAME=\"Sensor\" -DSENSOR_TYPE=1 -DDATA_RATE=1 -DCHANNEL_NUM=1
 CFLAGS += -I../../TinyECC -I../lib
 
 CFLAGS += -W -Wall -Wno-unused-parameter -Wno-unused-variable -Wno-override-init

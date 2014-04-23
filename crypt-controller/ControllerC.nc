@@ -34,6 +34,7 @@ module ControllerC @safe()
     interface ChannelTable;
     interface ChannelState;
     interface KNoTCrypt as KNoT;
+    interface LocalTime<TMilli>;
   }
 }
 implementation
@@ -51,6 +52,12 @@ implementation
                         };
   uint16_t privateKey[11] = {0xbf3d, 0x27bd, 0x26a3, 0xa2d7, 0x1225, 0x2cc1, 0x7899, 0xd02d, 0x914c, 0x1382, 0x0000};
   /* Checks the timer for a channel's state, retransmitting when necessary */
+  long start_t;
+  void markEndTime(long end_t){
+    long elapsed = end_t - start_t;
+    PRINTF("Elapsed: %d\n", elapsed);
+  }
+
 	void check_timer(ChanState *state) {
     decrement_ticks(state);
     if (ticks_left(state)) return;
@@ -127,10 +134,12 @@ implementation
   void forward_to_cache(ChanState *state, uint8_t *data, uint8_t len) {
     PDataPayload *new_dp = (PDataPayload *)&(state->packet); 
     SerialResponseMsg *srmsg = (SerialResponseMsg *) new_dp->dp.data;
+
     memcpy(&(srmsg->data), data, len);
     srmsg->src = state->remote_addr;
-    pdp_complete(new_pdp, state->chan_num, state->remote_chan_num, 
-               RESPONSE, sizeof(SerialResponseMsg));
+   /* pdp_complete(new_pdp, state->chan_num, state->remote_chan_num, 
+               RESPONSE, sizeof(SerialResponseMsg));*/
+    start_t = call LocalTime.get();
     send_on_serial(new_dp);
   }
 	/*------------------------------------------------- */
@@ -298,6 +307,7 @@ implementation
         call KNoT.connect(s, s->remote_addr, ((SerialConnect*)data)->rate);
         break;
       }
+      case(CMD): markEndTime(call LocalTime.get());
 		}
 		call LEDBlink.report_received();
   	return msg;
