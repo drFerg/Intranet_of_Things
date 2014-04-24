@@ -134,10 +134,14 @@ implementation {
     uint8_t cmd = pdp->dp.hdr.cmd;
     uint8_t payload_len = sizeof(PayloadHeader) + sizeof(DataHeader) + pdp->dp.dhdr.tlen;
     uint8_t pkt_len = FLAG_SIZE + MAC_SIZE + sizeof(ChanHeader) + payload_len; 
-		SSecPacket *sp = (SSecPacket *) (call AMSend.getPayload(&am_pkt, pkt_len));
+	SSecPacket *sp = (SSecPacket *) (call AMSend.getPayload(&am_pkt, pkt_len));
 		/* Encrypt DataPayload and place into SSecurePacket's DataPayload with tag/mac*/
-		call MiniSec.encrypt(&cc[chan], (uint8_t*) &(pdp->dp), payload_len, 
+	long e, s;
+	s = call LocalTime.get();
+	call MiniSec.encrypt(&cc[chan], (uint8_t*) &(pdp->dp), payload_len, 
                          (uint8_t*) &(sp->dp), (uint8_t*) &(sp->sh.tag));
+	e = call LocalTime.get();
+	PRINTF("encrypt: %d\n", e - s);	
     memcpy(&(sp->ch), &(pdp->ch), sizeof(ChanHeader));
 		sp->flags = 0;
 		sp->flags |= SYMMETRIC_MASK; /* Set symmetric flag */
@@ -201,8 +205,7 @@ implementation {
 
 	command void KNoT.knot_broadcast(ChanState *state){
 		increment_seq_no(state);
-		send_encrypted(AM_BROADCAST_ADDR, state->chan_num, 
-                   (PDataPayload *)&(state->packet));
+		send(AM_BROADCAST_ADDR, (PDataPayload *)&(state->packet));
 	}
 
 
@@ -357,29 +360,29 @@ implementation {
 
 /**** RESPONSE CALLS AND HANDLERS ***/
 	command void KNoT.send_value(ChanState *state, uint8_t *data, uint8_t len){
-    PDataPayload *new_pdp = (PDataPayload *) &(state->packet);
-		ResponseMsg *rmsg = (ResponseMsg*)&(new_pdp->dp.data);
+    	PDataPayload *new_pdp = (PDataPayload *) &(state->packet);
+		ResponseMsg *rmsg = (ResponseMsg*) &(new_pdp->dp.data);
 		// Send a Response SYN or Response
 		if (state->state == STATE_CONNECTED){
-      clean_packet(new_pdp);
-      new_pdp->dp.hdr.cmd = RESPONSE;
-      state->ticks_till_ping--;
-    } 
-    else if(state->state == STATE_RSYN){
-    	clean_packet(new_pdp);
-	    new_pdp->dp.hdr.cmd = RSYN; // Send to ensure controller is still out there
-	    state->ticks_till_ping = RSYN_RATE;
-	    set_state(state, STATE_RACK_WAIT);
-    } 
-    else if (state->state == STATE_RACK_WAIT){
-    	return; /* Waiting for response, no more sensor sends */
-    }
-    memcpy(&(rmsg->data), data, len);
-    new_pdp->ch.src_chan_num = state->chan_num;
-	  new_pdp->ch.dst_chan_num = state->remote_chan_num;
-    new_pdp->dp.dhdr.tlen = sizeof(ResponseMsg);
-    PRINTF("Sending data\n");
-    send_on_sym_chan(state, new_pdp);
+			clean_packet(new_pdp);
+			new_pdp->dp.hdr.cmd = RESPONSE;
+			state->ticks_till_ping--;
+		} 
+		else if(state->state == STATE_RSYN){
+			clean_packet(new_pdp);
+		    new_pdp->dp.hdr.cmd = RSYN; // Send to ensure controller is still out there
+		    state->ticks_till_ping = RSYN_RATE;
+		    set_state(state, STATE_RACK_WAIT);
+		} 
+		else if (state->state == STATE_RACK_WAIT){
+			return; /* Waiting for response, no more sensor sends */
+		}
+		memcpy(&(rmsg->data), data, len);
+		new_pdp->ch.src_chan_num = state->chan_num;
+	    new_pdp->ch.dst_chan_num = state->remote_chan_num;
+		new_pdp->dp.dhdr.tlen = len;
+		PRINTF("Sending data\n");
+		send_on_sym_chan(state, new_pdp);
 	}
 
 	command uint8_t KNoT.response_handler(ChanState *state, PDataPayload *pdp, uint8_t *buf){
@@ -393,7 +396,7 @@ implementation {
 		rmsg = (ResponseMsg *) &(pdp->dp.data);
 		memcpy(buf, &(rmsg->data), 1);
 		PRINTF("KNOT>> Data rvd: %d\n", buf[0]);
-    return 1;
+    	return 1;
 	}
 
 	command void KNoT.send_rack(ChanState *state){
@@ -472,9 +475,13 @@ implementation {
 
 	command void KNoT.receiveDecrypt(ChanState *state, SSecPacket *sp, uint8_t len, uint8_t *valid){
 	    uint8_t cipher_len = len - sizeof(ChanHeader) - MAC_SIZE - FLAG_SIZE;
+	    long s, e;
 	    PRINTF("SYM>> e_payload size: %d\n", cipher_len);
+	    s = call LocalTime.get();
 	    call MiniSec.decrypt(&cc[state->chan_num], sp->flags, (uint8_t *)&(sp->dp), 
 	                         cipher_len, (uint8_t *)&(sp->dp), (uint8_t *)&(sp->sh.tag), valid);
+	    e = call LocalTime.get();
+	    PRINTF("decrypt: %d\n", e - s);
 	    PRINTF("SYM>> Valid MAC: %s\n", (*valid?"yes":"no"));PRINTFFLUSH();
 	}
 

@@ -1,0 +1,19 @@
+subscribe t to Temp;
+associate limit with TempLimits;
+identifier id; 
+sequence s;
+behavior {
+  id = Identifier(t.src);
+  if (hasEntry(limit, id)) {
+    upperLimit = seqElement(lookup(limit, id), 2);
+    lowerLimit = seqElement(lookup(limit, id), 3);
+    if (t.temp >= upperLimit) {
+      s = Sequence(t.src, t.temp, upperLimit);
+      send(s, 'temp exceeded upper limit!');
+    }
+    else if (t.temp <= lowerLimit) {
+      s = Sequence(t.src, t.temp, lowerLimit);
+      send(s, 'temp below lower limit!');
+    }
+  }
+}
