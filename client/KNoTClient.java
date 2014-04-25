@@ -2,9 +2,12 @@ import net.tinyos.message.*;
 import net.tinyos.util.*;
 import java.io.*;
 import java.util.Scanner;
-
-
-
+import jCache.*;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
+import java.nio.file.Files;
+import java.nio.ByteBuffer;
 public class KNoTClient implements MessageListener
 {
 
@@ -12,6 +15,12 @@ public class KNoTClient implements MessageListener
     int MYID = 0;
     int MOTEID = 1;
     short seqno = 1;
+    static Service service;
+    String serviceName = "Handler";
+    int port;
+    Connection conn;
+    Receiver recvr;
+    Thread recvrThread;
 
     private void cli(){
         Scanner input = new Scanner(System.in);
@@ -22,14 +31,10 @@ public class KNoTClient implements MessageListener
                 query();
             }
             else if (command.equals("c") || command.equals("connect")){
-                connect(input.nextInt(), input.nextInt());
+                connect(input.nextInt(), input.nextInt(), input.nextInt());
             }
             else if (command.equals("help")){
-                System.out.println("Help:\n" +
-                                   "tweet <message>\n" + 
-                                   "get\t(gets followed tweets)\n" +
-                                   "follow <id>\n" +
-                                   "connect <id> (sets tweet node)");          
+                System.out.println("You're on your own :P");          
             }
             System.out.print(">>");
             command = input.next();
@@ -39,9 +44,25 @@ public class KNoTClient implements MessageListener
     }
 
     /* Main entry point */
-    void run() {
+    void run(String automaton) {
         mote = new MoteIF(PrintStreamMessenger.err);
         mote.registerListener(new DataPayloadMsg(), this);
+        try {
+            SRPC srpc = new SRPC();
+            service = srpc.offer(serviceName);
+            //(new Thread(new HWDBClient())).start();
+            conn = srpc.connect("localhost", 1234,"HWDB");
+            port = srpc.details().getPort();
+            recvr = new Receiver(service, this);
+            recvrThread = new Thread(recvr);
+            recvrThread.start();
+            //System.out.println(conn.call(String.format("SQL:create table Temp (id integer, temp integer) 127.0.0.1 %d %s", port, serviceName)));
+            //System.out.println(conn.call(String.format("SQL:create persistenttable Averages (id integer primary key, avg integer)")));
+            System.out.println(conn.call(String.format("SQL:register \"%s\" 127.0.0.1 %d %s", automaton, port, serviceName)));
+        }
+        catch (Exception e) {
+            System.exit(1);
+        }
         cli();
     }
 
@@ -76,7 +97,7 @@ public class KNoTClient implements MessageListener
         sendMsg(msg);
     }
 
-    void connect(int chan, int rate){
+    void connect(int chan, int addr, int rate){
         System.out.println("Initiating connection to " + addr + " at " + rate);
         DataPayloadMsg msg = new DataPayloadMsg();
         msg.set_ch_src_chan_num((short) chan);
@@ -88,82 +109,32 @@ public class KNoTClient implements MessageListener
         msg.set_dp_data(data);
         sendMsg(msg);
     }
-    // void getTweets(){
-    //     System.out.printf("Node %d: Getting tweets...\n",MOTEID);
-    //     TinyBlogMsg msg = new TinyBlogMsg();
-    //     msg.set_action(GET_TWEETS);
-    //     msg.set_destMoteID(MOTEID);
-    //     msg.set_nchars((short)0);
-    //     sendMsg(msg);
-    // }
-    // void tweet(String text){
-    //     if (text.length() >100){
-    //         System.out.println("Tweet to long, needs to be < 101 chars");
-    //         return;
-    //     }
-    //     System.out.println("Tweet: " + text);
-    //     System.out.printf("Node %d: Sending tweet...", MOTEID);
-    //     short[] data = convertStringToShort(text);
-    //     short len = (short)data.length;
-    //     TinyBlogMsg msg = new TinyBlogMsg();
-    //     msg.set_action(POST_TWEET);
-    //     msg.set_destMoteID(MOTEID);
-    //     msg.set_data(data);
-    //     msg.set_nchars(len);
-    //     sendMsg(msg);
-    //     System.out.println("sent!");
-    // }
-
-    // void directMessage(int dest, String text){
-    //     if (text.length() >100){
-    //         System.out.println("Tweet to long, needs to be < 101 chars");
-    //         return;
-    //     }
-    //     System.out.println("Direct msg: " + text);
-    //     System.out.printf("Node %d: Sending message...", MOTEID);
-    //     short[] data = convertStringToShort(text);
-    //     short len = (short)data.length;
-    //     TinyBlogMsg msg = new TinyBlogMsg();
-    //     msg.set_action(DIRECT_MESSAGE);
-    //     msg.set_destMoteID(dest);
-    //     msg.set_data(data);
-    //     msg.set_nchars(len);
-    //     sendMsg(msg);
-    //     System.out.println("sent!");
-
-    // }
 
 
-    public synchronized void messageReceived(int dest_addr, Message msg) {
+
+    public synchronized void messageReceived(int dest_addr, net.tinyos.message.Message msg) {
         if (msg instanceof DataPayloadMsg) {
-            System.out.println("Received a packet");
-            if (((DataPayloadMsg)msg).get_dp_hdr_cmd() == 5){
-                System.out.println("Received data: Temp is: ");
+            System.out.print("Received data: Temp is: ");
+            int val = ((DataPayloadMsg)msg).get_dp_data()[0];
+            int src = ((DataPayloadMsg)msg).get_dp_data()[1];
+            System.out.println(val);
+            String cmd = String.format("SQL:insert into Temp values ('%d', '%d') 127.0.0.1 %d %s", src, val, port, serviceName);
+            System.out.println(cmd);
+            try {
+                System.out.println(conn.call(cmd));
+            } 
+            catch (Exception e) {
+                System.exit(1);
+            }
+            if (((DataPayloadMsg)msg).get_dp_hdr_cmd() == 16){
+                System.out.print("Received data: Temp is: ");
+                System.out.println(val);
             }
         }
-        // if (msg instanceof TinyBlogMsg) {
-        //     TinyBlogMsg tbmsg = (TinyBlogMsg)msg;
-        //     if (tbmsg.get_action() == RETURN_TWEETS){
-        //         System.out.printf("Node %d tweeted: %s\nMood = %d\nseqno: %d\n", tbmsg.get_sourceMoteID(), 
-        //             convertShortToString(tbmsg.get_data(),tbmsg.get_nchars()), tbmsg.get_mood(),tbmsg.get_seqno());
-        //     } else if(tbmsg.get_action() == DIRECT_MESSAGE && tbmsg.get_destMoteID() == MYID ){
-        //         System.out.printf("Node %d direct messaged you: %s\n\nseqno: %d\n", tbmsg.get_sourceMoteID(), 
-        //             convertShortToString(tbmsg.get_data(),tbmsg.get_nchars()),tbmsg.get_seqno());
-        //     }else if (tbmsg.get_sourceMoteID() != MOTEID ){
-        //         //System.out.println("Received a msg");
-        //         return;
-        //     }
-        // }
-        // System.out.print(">>");
+        System.out.println(">> ");
     }
 
-    /* The user wants to set the interval to newPeriod. Refuse bogus values
-       and return false, or accept the change, broadcast it, and return
-       true */
-
-    /* Broadcast a version+interval message. */
     void sendMsg(DataPayloadMsg msg) {
-
         // msg.set_sourceMoteID(MYID);
         // msg.set_seqno(seqno++);
         // msg.set_hopCount((short)6);
@@ -176,11 +147,22 @@ public class KNoTClient implements MessageListener
         }
     }
 
-    /* User wants to clear all data. */
-
-
     public static void main(String[] args) {
         KNoTClient me = new KNoTClient();
-        me.run();
+        String content = "";
+        try {
+            content = readFile(args[0], Charset.defaultCharset());
+        } catch (IOException e) {
+            System.out.println("File not found");
+        }
+        content = content.replaceAll("\n", " ").replaceAll("\\s+", " ");
+        System.out.println(content);
+        me.run(content);
+    }
+
+    static String readFile(String path, Charset encoding) throws IOException {
+        byte[] encoded = Files.readAllBytes(Paths.get(path));
+        return encoding.decode(ByteBuffer.wrap(encoded)).toString();
     }
 }
+

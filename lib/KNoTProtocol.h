@@ -181,7 +181,7 @@ typedef nx_struct serial_query_response{
 }SerialQueryResponseMsg;
 
 typedef nx_struct serial_response{
-   nx_uint16_t data;
+   nx_uint8_t data;
    nx_uint8_t src;
 }SerialResponseMsg;
 

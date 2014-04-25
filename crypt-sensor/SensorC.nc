@@ -44,13 +44,13 @@ implementation
   ChanState home_chan;
   uint8_t testKey_size = 10;
   uint32_t nonce;
-  Point publicKey = { .x = {0x5d75, 0xa416, 0x94f6, 0x703e, 0x7f9e, 0xf511, 0x3315, 0x3b73, 0x7ca8, 0x442b},
-                      .y = {0xbf3e, 0xeeef, 0x7517, 0x1505, 0x4f20, 0x9bae, 0x3426, 0x5b00, 0x377c, 0xac91}
+  Point publicKey = { .x = {0x6ebb, 0xbae1, 0x8f0b, 0xedaf, 0x6b4c, 0xc52d, 0xddc1, 0xff61, 0xb98c, 0xca2c},
+                      .y = {0xbf61, 0x81d6, 0xdbd9, 0x5fb3, 0x96a2, 0x7ef6, 0x2b2d, 0xe86d, 0x59f2, 0x83c3}
                     };
-  Point pkc_signature = { .x = {0x6df6, 0x675b, 0x44d9, 0x3e11, 0xd26c, 0xb723, 0x5b14, 0x3b7d, 0x8fc1, 0xcfcc},
-                          .y = {0x9ffb, 0xcba4, 0xf71c, 0xfed3, 0xbdda, 0xcca6, 0x15f0, 0x4f2e, 0xe17f, 0x69ad}
+  Point pkc_signature = { .x = {0xbe45, 0xb54e, 0x16aa, 0xe85b, 0xc0cf, 0x80b4, 0x3b27, 0x7df9, 0xc3cc, 0x08e2},
+                          .y = {0x3956, 0xa6f9, 0xe450, 0xe298, 0xcec6, 0x2f27, 0x7778, 0x64a1, 0x5278, 0xc693}
                         };
-  uint16_t privateKey[11] = {0xbf3d, 0x27bd, 0x26a3, 0xa2d7, 0x1225, 0x2cc1, 0x7899, 0xd02d, 0x914c, 0x1382, 0x0000};
+  uint16_t privateKey[11] = {0x7239, 0xb09b, 0x0549, 0x40e7, 0x4158, 0x2e7d, 0x1ec3, 0x7fbb, 0xbd4b, 0x28a2, 0x0000};
   /* Checks the timer for a channel's state, retransmitting when necessary */
   void check_timer(ChanState *state) {
     decrement_ticks(state);
@@ -89,7 +89,7 @@ implementation
           }*/
   }
         /*------------------------------------------------------- */
-  ChanState * pkc_verification(PDataPayload *pdp, uint8_t src){
+  ChanState *verify_pkc(PDataPayload *pdp, uint8_t src){
     /*Assume most certificates will be good */
     ChanState *state = call ChannelTable.new_channel(); 
     if (call KNoT.asym_pkc_handler(state, pdp) != VALID_PKC) {
@@ -124,9 +124,7 @@ implementation
     call LEDBlink.report_problem();
     call ChannelTable.init_table();
     call ChannelState.init_state(&home_chan, 0);
-    //call Timer.startOneShot(5000);
     call CleanerTimer.startPeriodic(TICK_RATE);
-    //call KNoT.init_symmetric(&home_chan, testKey, testKey_size);
     call KNoT.init_asymmetric(privateKey, &publicKey, &pkc_signature);
   }
 
@@ -155,8 +153,7 @@ implementation
       if (sp->ch.dst_chan_num) { /* Get state for channel */ 
         state = retrieve_state(sp->ch.dst_chan_num, &(sp->ch), pdp, src);
         if (!state) return msg;
-      }
-      else state = &home_chan;
+      } else state = &home_chan;
       call KNoT.receiveDecrypt(state, sp, len, &valid);
       if (!valid) return msg; /* Return if decryption failed */
       pdp = (PDataPayload *) (&sp->ch); /* Offsetting to start of pdp */
@@ -166,7 +163,7 @@ implementation
       pdp = (PDataPayload *) &(p->ch);
       if (pdp->dp.hdr.cmd == ASYM_QUERY){
         PRINTF("Received query\n");PRINTFFLUSH();
-        state = pkc_verification(pdp, src);
+        state = verify_pkc(pdp, src);
         if (!state) return msg;
         call KNoT.send_asym_resp(state);
         set_state(state, STATE_ASYM_RESP);
@@ -217,7 +214,11 @@ implementation
       case(PING): call KNoT.ping_handler(state, pdp); break;
       case(PACK): call KNoT.pack_handler(state, pdp); break;
       case(RACK): call KNoT.rack_handler(state, pdp); break;
-      case(DISCONNECT): call KNoT.disconnect_handler(state, pdp); call Timer.stop();break;
+      case(DISCONNECT): {
+        call KNoT.disconnect_handler(state, pdp); 
+        call Timer.stop();
+        break;
+      }
       default: PRINTF("Unknown CMD type\n");
     }
     call LEDBlink.report_received();

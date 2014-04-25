@@ -11,6 +11,9 @@ client.jar: KNoTClient.class
 DataPayloadMsg.java: ../lib/KNoTProtocol.h
 	mig -target=null $(CFLAGS) -java-classname=DataPayloadMsg java Payloads.h plain_data_payload -o $@
 
+SerialResponseMsg.java: ../lib/KNoTProtocol.h
+	mig -target=null $(CFLAGS) -java-classname=SerialResponseMsg java Payloads.h serial_response -o $@
+
 #Constants.java: ../TinyBlogMsg.h
 #	ncg -target=null $(CFLAGS) -java-classname=Constants java ../TinyBlogMsg.h DIRECT_MESSAGE DATA_SIZE POST_TWEET ADD_USER GET_TWEETS INTEREST TWEET_EVENT -o $@
 

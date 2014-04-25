@@ -78,7 +78,7 @@ public class show_genKeys implements MessageListener
     public show_genKeys() throws Exception
     {
         // connect to the SerialForwarder running on the local mote
-        MoteIF mote = new MoteIF((net.tinyos.util.Messenger) null);
+        MoteIF mote = new MoteIF();
 
         // prepare to listen for messages of type result
         mote.registerListener(new private_key_msg(), this);
